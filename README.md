@@ -1,0 +1,46 @@
+# Big Boys Rental API
+
+The original workspace is a static marketplace prototype. The booking API uses Node.js, Express, Prisma, and PostgreSQL.
+
+## Mockup-only testing
+
+Open `index.html` directly to test the marketplace without Node.js or a database. The mock equipment list supports booking requests, owner approval, and an offline simulator that marks a booking `PAID_IN_ESCROW` without processing a payment. To use the actual PayMongo Sandbox with mock equipment, set `PAYMONGO_SECRET_KEY` in the ignored `.env`, start the API with `npm start`, and open `http://localhost:3000`. The mock checkout API validates prices against the server-side demo catalog and creates a real PayMongo Checkout Session without requiring PostgreSQL. Mock bookings are saved in the current browser tab so the app can verify payment after PayMongo redirects back; the API must remain running during checkout. This development-only mock checkout endpoint is disabled in production. Never commit `.env`.
+
+## Setup
+
+1. If `.env` does not exist, copy `.env.example` to `.env`. Set `DATABASE_URL`, `APP_URL`, `PAYMONGO_SECRET_KEY`, and `PAYMONGO_WEBHOOK_SECRET` in `.env` (never put credentials in `.env.example`).
+2. Install dependencies with `npm install`.
+3. Generate the Prisma client with `npm run db:generate`.
+4. Apply the migration with `npm run db:migrate`.
+5. Populate the demo inventory with `npm run db:seed`.
+6. Start the API with `npm start` (defaults to port `3000`).
+7. Open `http://localhost:3000` to use the UI from the same origin as the API.
+
+`npm run db:migrate:dev` applies migrations during local development.
+
+## Booking API
+
+- `GET /api/equipment` returns equipment IDs and current logistics rates for the catalog.
+- `GET /api/bookings?renterId=...` or `GET /api/bookings?ownerId=...` returns persisted bookings for the corresponding account.
+- `POST /api/bookings` accepts `{"equipmentId":"equipment-id","renterId":"renter-id","rentalHours":8,"distanceKm":12.5,"startDate":"2026-11-02","endDate":"2026-11-02"}`, calculates and snapshots the financial breakdown, and creates a `PENDING_APPROVAL` booking. The date fields are optional but must be supplied together when used.
+- `PATCH /api/bookings/:bookingId/approve` accepts `{"ownerId":"equipment-owner-id"}`, verifies the owner matches the equipment, and changes a pending booking to `AWAITING_PAYMENT`.
+
+`calculateBookingFinancials` in `src/booking-financials.js` calculates rental cost, round-trip travel, gross total, platform fee, and owner payout. All monetary results are rounded to cents.
+
+## PayMongo Sandbox
+
+- Use a PayMongo **test** secret key beginning with `sk_test_`; live keys are rejected by the checkout integration.
+- Checkout Sessions are created and retrieved with PayMongo's `/v1/checkout_sessions` API.
+- Configure the PayMongo webhook URL as `https://<your-public-host>/api/payments/paymongo/webhook` and subscribe to `checkout_session.payment.paid`. Set the endpoint's signing secret as `PAYMONGO_WEBHOOK_SECRET`.
+- `POST /api/create-checkout-session` creates (or reuses) a PayMongo Checkout Session for an approved database booking (`{"bookingId":"..."}`) or a server-priced demo listing (`{"mock":true,"bookingId":"...","equipmentId":1,"rentalHours":8,"distanceKm":12.5}`). The route returns `checkout_url` and redirects to `http://localhost:3000` after checkout by default.
+- `POST /api/bookings/:bookingId/checkout-session` remains available as the database-booking-specific checkout route.
+- `GET /api/bookings/:bookingId/checkout-details` returns the status and itemized totals used by the checkout UI.
+- `GET /api/admin/transactions` returns paid escrow ledger rows in non-production environments; the admin UI loads this when served by the API.
+- The webhook verifies the PayMongo signature and timestamp, retrieves the Checkout Session from PayMongo, checks that its paid amount matches the booking, then atomically marks the booking `PAID_IN_ESCROW` and equipment `ON_SITE`.
+- `POST /api/bookings/:bookingId/simulate-payment` is a development-only shortcut. It is disabled when `NODE_ENV=production`.
+
+The owner and renter IDs in the current prototype are not authenticated identities. Checkout is created automatically for the selected database booking; serve the page from this API and complete database setup for the request → approval → checkout flow. When the UI is served by this API in development, the admin ledger loads paid escrow records from the database; on the static prototype it displays in-memory demo records. The admin transaction endpoint is disabled in production until an admin authorization layer is added.
+
+## Authentication note
+
+This repository has no authentication provider or user tables. The owner/renter IDs accepted by these prototype endpoints are identifiers, not proof of identity. Put the API behind authenticated middleware and derive those IDs from the authenticated principal before using it for real bookings or approvals.
