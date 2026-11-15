@@ -15,12 +15,16 @@ export function createEquipmentRouter(prisma) {
           baseDeliveryFee: true,
           ratePerKm: true,
           status: true,
-          nextAvailableDate: true
+          nextAvailableDate: true,
+          isFeatured: true,
+          boostRegion: true,
+          featureExpiresAt: true
         }
       });
       res.json({
         equipment: equipment.map(item => ({
           ...item,
+          isFeatured: item.isFeatured && (!item.featureExpiresAt || item.featureExpiresAt > new Date()),
           hourlyRate: item.hourlyRate.toString(),
           baseDeliveryFee: item.baseDeliveryFee.toString(),
           ratePerKm: item.ratePerKm.toString()

@@ -1,21 +1,25 @@
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import express from 'express';
+import { createAdminAuthRouter } from './admin-auth.js';
 import { ApiError, createBookingsRouter } from './bookings.js';
 import { createEquipmentRouter } from './equipment.js';
 import { createPaymentsRouter } from './payments.js';
+import { createRuntimeStore } from './runtime-store.js';
 
 export function createApp(prisma) {
   const app = express();
+  const runtimeStore = createRuntimeStore(prisma);
   app.use(express.json({
     limit: '100kb',
     verify(req, res, buffer) {
       req.rawBody = Buffer.from(buffer);
     }
   }));
-  app.use('/api/equipment', createEquipmentRouter(prisma));
-  app.use('/api/bookings', createBookingsRouter(prisma));
-  app.use('/api', createPaymentsRouter(prisma));
+  app.use('/api/auth', createAdminAuthRouter());
+  app.use('/api/equipment', createEquipmentRouter(runtimeStore));
+  app.use('/api/bookings', createBookingsRouter(runtimeStore));
+  app.use('/api', createPaymentsRouter(runtimeStore));
   const projectRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
   app.get(['/', '/index.html'], (req, res, next) => res.sendFile(join(projectRoot, 'index.html'), error => error && next(error)));
   for (const asset of ['app.js', 'styles.css', 'heroimage.jpg', 'BigBoys.jpg']) {

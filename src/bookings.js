@@ -87,8 +87,14 @@ export function createBookingsRouter(prisma) {
     }
     if (equipment.status === 'ON_SITE') {
       const availableDate = equipment.nextAvailableDate?.toISOString().slice(0, 10);
-      if (!startDate || !availableDate || startDate.toISOString().slice(0, 10) < availableDate) {
-        throw new ApiError(409, 'Equipment is on site and is not available for the selected dates.');
+      const firstBookableDate = availableDate
+        ? new Date(`${availableDate}T00:00:00.000Z`)
+        : null;
+      if (firstBookableDate) {
+        firstBookableDate.setUTCDate(firstBookableDate.getUTCDate() + 1);
+      }
+      if (!startDate || !firstBookableDate || startDate < firstBookableDate) {
+        throw new ApiError(409, 'Equipment is on site and can only be pre-booked starting the day after its return date.');
       }
     }
     if (startDate) {
@@ -182,6 +188,36 @@ export function createBookingsRouter(prisma) {
 
     const approvedBooking = await prisma.booking.findUnique({ where: { id: bookingId } });
     res.json({ booking: approvedBooking });
+  }));
+
+  router.patch('/:bookingId/decline', asyncHandler(async (req, res) => {
+    const bookingId = requireText(req.params.bookingId, 'bookingId');
+    const ownerId = requireText(req.body?.ownerId, 'ownerId');
+    const booking = await prisma.booking.findUnique({
+      where: { id: bookingId },
+      include: { equipment: true }
+    });
+
+    if (!booking) {
+      throw new ApiError(404, 'Booking was not found.');
+    }
+    if (booking.equipment.ownerId !== ownerId) {
+      throw new ApiError(403, 'Only the equipment owner can decline this booking.');
+    }
+    if (booking.bookingStatus !== 'PENDING_APPROVAL') {
+      throw new ApiError(409, 'Only bookings pending approval can be declined.');
+    }
+
+    const result = await prisma.booking.updateMany({
+      where: { id: bookingId, bookingStatus: 'PENDING_APPROVAL' },
+      data: { bookingStatus: 'DECLINED' }
+    });
+    if (result.count !== 1) {
+      throw new ApiError(409, 'Booking status changed before it could be declined.');
+    }
+
+    const declinedBooking = await prisma.booking.findUnique({ where: { id: bookingId } });
+    res.json({ booking: declinedBooking });
   }));
 
   return router;

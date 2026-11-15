@@ -1,3 +1,8 @@
+const demoDateAfterDays = days => {
+  const date = new Date();
+  date.setDate(date.getDate() + days);
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+};
 const equipment = [
       {
         id: 1,
@@ -11,6 +16,8 @@ const equipment = [
         rating: '4.9',
         reviews: 18,
         badge: 'Popular',
+        isFeatured: true,
+        boostRegion: 'Davao Region',
         status: 'AVAILABLE',
         nextAvailableDate: null,
         image: 'https://www.truck1.ph/img/xxl/37129/Hot-Sale-20-Ton-Crawler-Excavator-Komatsu-Pc200-6-Pc200-7-Pc200-8-Original-From-Japan-For-Sale-In-Shanghai-China_37129_1244976858879.jpg',
@@ -28,8 +35,9 @@ const equipment = [
         rating: '5.0',
         reviews: 12,
         badge: 'Available today',
+        isFeatured: false,
         status: 'ON_SITE',
-        nextAvailableDate: '2026-11-02',
+        nextAvailableDate: demoDateAfterDays(3),
         image: 'https://img.linemedia.com/img/s/construction-equipment-backhoe-loader-JCB-3CX---1750127843896797091_big--25061705291025888300.jpg',
         description: 'A versatile backhoe for trenching, loading, and utility work. Includes a standard bucket and operator-ready cab.'
       },
@@ -45,6 +53,8 @@ const equipment = [
         rating: '4.8',
         reviews: 26,
         badge: 'Great value',
+        isFeatured: true,
+        boostRegion: 'Davao Region',
         status: 'AVAILABLE',
         nextAvailableDate: null,
         image: 'https://image.made-in-china.com/229f0j00GapfBVgMvhuN/WeChat-20240623183902-mp4.webp',
@@ -62,6 +72,7 @@ const equipment = [
         rating: '4.7',
         reviews: 9,
         badge: 'Tight access',
+        isFeatured: false,
         status: 'AVAILABLE',
         nextAvailableDate: null,
         image: 'https://www.sanyamerica.com/wp-content/uploads/2021/06/SY35_Cab.webp',
@@ -79,8 +90,9 @@ const equipment = [
         rating: '4.9',
         reviews: 7,
         badge: 'Well maintained',
+        isFeatured: false,
         status: 'ON_SITE',
-        nextAvailableDate: '2026-10-30',
+        nextAvailableDate: demoDateAfterDays(6),
         image: 'https://eastpacificmotors.com/wp-content/uploads/2015/12/101_0229.jpg',
         description: 'A 10-wheeler tipper for hauling aggregate, soil, and construction debris. Confirm load limits and trip schedule with the owner.'
       },
@@ -96,6 +108,7 @@ const equipment = [
         rating: '4.8',
         reviews: 14,
         badge: 'Site ready',
+        isFeatured: false,
         status: 'AVAILABLE',
         nextAvailableDate: null,
         image: 'https://www.philmotors.com/preview-small/Philippines-1207-2102091.jpg',
@@ -113,6 +126,7 @@ const equipment = [
         rating: '4.9',
         reviews: 21,
         badge: 'Fleet favorite',
+        isFeatured: false,
         status: 'AVAILABLE',
         nextAvailableDate: null,
         image: 'https://mcdowellequipment.com/wp-content/uploads/2024/07/20240709_124304-scaled.jpg',
@@ -130,6 +144,7 @@ const equipment = [
         rating: '4.8',
         reviews: 15,
         badge: 'Ready to work',
+        isFeatured: false,
         status: 'AVAILABLE',
         nextAvailableDate: null,
         image: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQL3gWQcq8v4vLpBA3vTjrUYZO-2fXxjVoCBMBH8v6K7F6lZr2-fOjmxz9R&s=10',
@@ -170,13 +185,13 @@ const equipment = [
     ];
 
     try {
-      const savedMockBookings = JSON.parse(sessionStorage.getItem('bigboys-mock-bookings') || '[]');
+      const savedMockBookings = JSON.parse(localStorage.getItem('bigboys-mock-bookings') || '[]');
       if (Array.isArray(savedMockBookings)) {
         bookings.push(...savedMockBookings.filter(booking => booking?.isMock === true));
       }
     } catch (error) {
       console.error('Unable to restore mock bookings from this browser session:', error);
-      sessionStorage.removeItem('bigboys-mock-bookings');
+      localStorage.removeItem('bigboys-mock-bookings');
     }
 
     const grid = document.querySelector('#listing-grid');
@@ -186,13 +201,28 @@ const equipment = [
     const ownerView = document.querySelector('#owner-view');
     const adminView = document.querySelector('#admin-view');
     const signInButton = document.querySelector('#sign-in-button');
-    const savedLink = document.querySelector('#saved-link');
+    const appHeader = document.querySelector('#app-header');
+    const appTopbar = document.querySelector('#app-topbar');
+    const mobileMenuToggle = document.querySelector('#mobile-menu-toggle');
+    const renterNavLinks = document.querySelector('#renter-nav-links');
+    const ownerNavLinks = document.querySelector('#owner-nav-links');
+    const accountEmail = document.querySelector('#account-email');
+    const signOutButton = document.querySelector('#app-signout-button');
+    const brandModeLabel = document.querySelector('#brand-mode-label');
+    const ownerModeSwitch = document.querySelector('#owner-mode-switch');
+    const renterModeSwitch = document.querySelector('#renter-mode-switch');
     const homeAreaInput = document.querySelector('#home-area');
     const nearbyAreasInput = document.querySelector('#nearby-areas');
     const searchForm = document.querySelector('#search-form');
-    const dialog = document.querySelector('#equipment-dialog');
+    const dialog = document.querySelector('#bookingModal');
     const checkoutDialog = document.querySelector('#checkout-dialog');
+    const editEquipmentDialog = document.querySelector('#edit-equipment-dialog');
+    const ownerForm = document.querySelector('#owner-form');
+    const ownerFormSlot = document.querySelector('#owner-form-slot');
+    const editFormSlot = document.querySelector('#edit-form-slot');
     const saved = new Set();
+    const accountMenus = [...document.querySelectorAll('[data-account-menu]')];
+    let notifications = [];
     let activeCategory = 'all';
     let signedInRole = '';
     let pendingListingAction = null;
@@ -202,7 +232,9 @@ const equipment = [
     let activePhotoIndex = 0;
     let editingEquipmentId = null;
     let activeCheckoutBooking = null;
+    let activeFeatureMachine = null;
     let signedInEmail = '';
+    let contextualSignIn = false;
     let persistedEquipmentLoaded = false;
     let equipmentLoadPromise = Promise.resolve();
     const nearbyCities = {
@@ -210,20 +242,239 @@ const equipment = [
       panabo: ['tagum', 'davao'],
       davao: ['tagum', 'panabo']
     };
+    const davaoRegionCities = new Set([
+      'davao', 'tagum', 'panabo', 'samal', 'mati', 'digos',
+      'malita', 'malalag', 'santa cruz', 'magsaysay', 'bansalan',
+      'matanao', 'hagonoy', 'padada', 'sulop', 'mabini', 'lupon',
+      'banaybanay', 'baganga', 'cateel', 'caraga', 'manay',
+      'tarragona', 'monkayo', 'nabunturan', 'compostela', 'maco',
+      'mawab', 'new bataan', 'laak', 'maragusan', 'pantukan',
+      'kapalong', 'asuncion', 'san isidro', 'talaingod'
+    ]);
+    const davaoRegionAreas = new Set([
+      'davao del norte', 'davao del sur', 'davao oriental',
+      'davao occidental', 'davao de oro'
+    ]);
 
     const normalizeCity = value => value.trim().toLowerCase().replace(/\s+city$/, '').trim();
+    const isDavaoRegionQuery = value => isDavaoRegionCityQuery(value)
+      || isDavaoRegionWideQuery(value);
+    const isDavaoRegionCityQuery = value => davaoRegionCities.has(normalizeCity(value));
+    const isDavaoRegionWideQuery = value => {
+      const location = normalizeCity(value);
+      return location === 'davao region'
+        || location === 'region xi'
+        || location === 'region 11'
+        || davaoRegionAreas.has(location);
+    };
+    const isDavaoRegionListing = item => item.boostRegion === 'Davao Region'
+      || davaoRegionCities.has(normalizeCity(item.location));
 
-    function updateContractorHeader() {
+    function loadSavedEquipment() {
+      try {
+        const stored = JSON.parse(localStorage.getItem('bigboys-saved-equipment') || '[]');
+        if (!Array.isArray(stored)) throw new TypeError('Saved equipment data must be an array.');
+        for (const id of stored) {
+          if (Number.isInteger(id) && equipment.some(machine => machine.id === id)) saved.add(id);
+        }
+      } catch (error) {
+        console.error('Unable to restore saved equipment:', error);
+        localStorage.removeItem('bigboys-saved-equipment');
+      }
+    }
+
+    function loadFeaturedEquipment() {
+      try {
+        const stored = JSON.parse(localStorage.getItem('bigboys-featured-equipment') || '[]');
+        if (!Array.isArray(stored)) throw new TypeError('Featured equipment data must be an array.');
+        for (const feature of stored) {
+          if (!Number.isInteger(feature?.id) || typeof feature.boostRegion !== 'string') continue;
+          const machine = equipment.find(item => item.id === feature.id);
+          if (!machine) continue;
+          if (feature.expiresAt && Date.parse(feature.expiresAt) <= Date.now()) continue;
+          Object.assign(machine, {
+            isFeatured: true,
+            boostRegion: feature.boostRegion,
+            featureExpiresAt: feature.expiresAt || null
+          });
+        }
+      } catch (error) {
+        console.error('Unable to restore featured equipment:', error);
+        localStorage.removeItem('bigboys-featured-equipment');
+      }
+    }
+
+    function loadLocalEquipment() {
+      try {
+        const stored = JSON.parse(localStorage.getItem('bigboys-owner-equipment') || '[]');
+        if (!Array.isArray(stored)) throw new TypeError('Owner equipment data must be an array.');
+        for (const item of stored) {
+          if (!item || item.localOnly !== true || !Number.isInteger(item.id) || typeof item.name !== 'string') continue;
+          if (equipment.some(machine => machine.id === item.id || machine.name === item.name)) continue;
+          equipment.push(item);
+        }
+      } catch (error) {
+        console.error('Unable to restore locally saved owner equipment:', error);
+        localStorage.removeItem('bigboys-owner-equipment');
+      }
+    }
+
+    function persistLocalEquipment() {
+      try {
+        localStorage.setItem('bigboys-owner-equipment', JSON.stringify(equipment.filter(item => item.localOnly === true)));
+      } catch (error) {
+        console.error('Unable to save locally managed owner equipment:', error);
+        notify('Owner equipment could not be stored in this browser.');
+      }
+    }
+
+    function persistFeaturedEquipment(machine) {
+      try {
+        const featuredMachines = equipment
+          .filter(item => item.isFeatured)
+          .map(item => ({ id: item.id, boostRegion: item.boostRegion, expiresAt: item.featureExpiresAt || null }));
+        localStorage.setItem('bigboys-featured-equipment', JSON.stringify(featuredMachines));
+      } catch (error) {
+        console.error('Unable to save featured equipment:', error);
+        notify(`${machine.name} was featured, but the preference could not be saved in this browser.`);
+      }
+    }
+
+    function isCurrentlyFeatured(machine) {
+      return machine.isFeatured === true
+        && (!machine.featureExpiresAt || Date.parse(machine.featureExpiresAt) > Date.now());
+    }
+
+    function persistSavedEquipment() {
+      try {
+        localStorage.setItem('bigboys-saved-equipment', JSON.stringify([...saved]));
+      } catch (error) {
+        console.error('Unable to save equipment preferences:', error);
+        notify('Saved equipment could not be stored in this browser.');
+      }
+    }
+
+    function loadNotifications() {
+      try {
+        const stored = JSON.parse(localStorage.getItem('bigboys-notifications') || '[]');
+        if (!Array.isArray(stored)) throw new TypeError('Notification data must be an array.');
+        notifications = stored.filter(item =>
+          item
+          && typeof item.id === 'string'
+          && ['owner', 'renter'].includes(item.recipientRole)
+          && typeof item.message === 'string'
+          && typeof item.read === 'boolean'
+        ).slice(0, 100);
+      } catch (error) {
+        console.error('Unable to restore notifications:', error);
+        localStorage.removeItem('bigboys-notifications');
+      }
+    }
+
+    function persistNotifications() {
+      try {
+        localStorage.setItem('bigboys-notifications', JSON.stringify(notifications));
+      } catch (error) {
+        console.error('Unable to save notifications:', error);
+        notify('Notifications could not be stored in this browser.');
+      }
+    }
+
+    function activeNotificationRole() {
+      return ownerView.hidden ? 'renter' : 'owner';
+    }
+
+    function visibleNotifications() {
+      const role = activeNotificationRole();
+      return notifications.filter(item =>
+        item.recipientRole === role
+        && (role === 'owner' || !item.recipientEmail || item.recipientEmail === signedInEmail)
+      );
+    }
+
+    function renderAccountMenus() {
+      const roleNotifications = visibleNotifications();
+      const unreadCount = roleNotifications.filter(item => !item.read).length;
+      const badgeCount = unreadCount + saved.size;
+      for (const menu of accountMenus) {
+        const badge = menu.querySelector('[data-menu-badge]');
+        badge.textContent = badgeCount > 99 ? '99+' : String(badgeCount);
+        badge.hidden = badgeCount === 0;
+        badge.setAttribute('aria-label', `${unreadCount} unread notifications and ${saved.size} saved machines`);
+
+        const notificationList = menu.querySelector('[data-notification-list]');
+        notificationList.innerHTML = roleNotifications.length
+          ? roleNotifications.map(item => `
+            <button type="button" class="notification-item ${item.read ? '' : 'unread'}" data-notification-id="${escapeHTML(item.id)}"${item.bookingId !== undefined ? ` data-booking-id="${escapeHTML(String(item.bookingId))}"` : ''}${item.apiBookingId ? ` data-api-booking-id="${escapeHTML(String(item.apiBookingId))}"` : ''}>
+              <span>${escapeHTML(item.message)}</span>
+              ${item.bookingId !== undefined ? '<small class="notification-action-hint">Open booking</small>' : ''}
+              <small>${new Date(item.createdAt).toLocaleString('en-PH', { dateStyle: 'medium', timeStyle: 'short' })}</small>
+            </button>`).join('')
+          : '<p class="popover-empty">No notifications yet.</p>';
+        menu.querySelectorAll('[data-saved-tab-count]').forEach(count => { count.textContent = String(saved.size); });
+        const savedList = menu.querySelector('[data-saved-list]');
+        const savedMachines = equipment.filter(machine => saved.has(machine.id));
+        savedList.innerHTML = savedMachines.length
+          ? savedMachines.map(machine => `
+            <article class="saved-item">
+              <div><strong>${escapeHTML(machine.name)}</strong><small>${escapeHTML(machine.location)} · ${peso(machine.hourly)}/hr</small></div>
+              <div class="saved-item-actions">
+                <button class="popover-action primary" type="button" data-saved-book="${machine.id}">Request Booking</button>
+                <button class="popover-action" type="button" data-saved-remove="${machine.id}">Remove</button>
+              </div>
+            </article>`).join('')
+          : '<p class="popover-empty">No saved equipment yet.</p>';
+      }
+    }
+
+    function addNotification(recipientRole, message, recipientEmail = '', bookingId = null, apiBookingId = null) {
+      notifications.unshift({
+        id: `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+        recipientRole,
+        recipientEmail,
+        message,
+        ...(bookingId === null ? {} : { bookingId }),
+        ...(apiBookingId === null ? {} : { apiBookingId }),
+        read: false,
+        createdAt: new Date().toISOString()
+      });
+      notifications = notifications.slice(0, 100);
+      persistNotifications();
+      renderAccountMenus();
+    }
+
+    function updateAppHeader() {
       const isContractorSignedIn = signedInRole === 'contractor';
-      savedLink.hidden = !isContractorSignedIn;
       signInButton.hidden = isContractorSignedIn;
-      document.querySelector('#contractor-view [data-signout]').hidden = !isContractorSignedIn;
+      signOutButton.hidden = !isContractorSignedIn;
+      ownerModeSwitch.hidden = !isContractorSignedIn || !ownerView.hidden;
+      renterModeSwitch.hidden = !isContractorSignedIn || ownerView.hidden;
+      renterNavLinks.hidden = !ownerView.hidden;
+      ownerNavLinks.hidden = ownerView.hidden;
+      accountEmail.hidden = !isContractorSignedIn;
+      accountEmail.textContent = isContractorSignedIn ? signedInEmail : '';
+      brandModeLabel.textContent = ownerView.hidden ? 'Equipment rental' : 'Fleet portal';
+      accountMenus.forEach(menu => {
+        menu.hidden = !isContractorSignedIn;
+        if (!isContractorSignedIn) {
+          menu.querySelector('[data-menu-popover]').hidden = true;
+          menu.querySelector('[data-menu-bell]').setAttribute('aria-expanded', 'false');
+        }
+      });
+      renderAccountMenus();
     }
 
     function openSignIn(action = null) {
       pendingListingAction = action;
-      document.querySelector('#login-role').value = 'contractor';
-      transitionTo(loginView);
+      contextualSignIn = Boolean(action);
+      loginView.classList.toggle('is-contextual', contextualSignIn);
+      document.querySelector('#login-message').hidden = true;
+      if (contextualSignIn) {
+        loginView.hidden = false;
+        document.querySelector('#login-email').focus();
+      } else {
+        transitionTo(loginView);
+      }
     }
 
     const peso = amount => `₱${Number(amount).toLocaleString('en-PH')}`;
@@ -248,6 +499,22 @@ const equipment = [
       return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
     };
     const availabilityDateISO = date => date ? String(date).slice(0, 10) : '';
+    const dayAfterISO = date => {
+      const dateValue = new Date(`${availabilityDateISO(date)}T00:00:00.000Z`);
+      dateValue.setUTCDate(dateValue.getUTCDate() + 1);
+      return dateValue.toISOString().slice(0, 10);
+    };
+    const formatBookingDate = date => new Date(`${date}T00:00:00`).toLocaleDateString('en-PH', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric'
+    });
+    const firstBookableDate = machine => {
+      const returnDate = availabilityDateISO(machine.nextAvailableDate);
+      return machine.status === 'ON_SITE' && returnDate && returnDate >= todayISO()
+        ? dayAfterISO(returnDate)
+        : todayISO();
+    };
     const formatAvailabilityDate = date => {
       if (!date) return 'date to be confirmed';
       return new Date(`${availabilityDateISO(date)}T00:00:00`).toLocaleDateString('en-PH', { year: 'numeric', month: 'short', day: 'numeric' });
@@ -275,13 +542,20 @@ const equipment = [
       const selectedEquipmentType = equipmentFilter.value;
       const homeArea = normalizeCity(homeAreaInput.value);
       const nearbyCitiesForArea = nearbyAreasInput.checked ? nearbyCities[homeArea] || [] : [];
+      const isRegionalSearch = isDavaoRegionQuery(homeArea);
       const matches = equipment.filter(item => {
         const itemCity = normalizeCity(item.location);
         const searchableType = `${item.type} ${item.name}`.toLowerCase();
         const matchesEquipmentType = selectedEquipmentType === 'all' || searchableType.includes(selectedEquipmentType);
-        const matchesCity = !homeArea || itemCity.includes(homeArea) || nearbyCitiesForArea.some(city => itemCity.includes(city));
+        const matchesCity = !homeArea
+          || (isDavaoRegionWideQuery(homeArea) && isDavaoRegionListing(item))
+          || (isRegionalSearch && isCurrentlyFeatured(item) && item.boostRegion === 'Davao Region')
+          || itemCity.includes(homeArea)
+          || nearbyCitiesForArea.some(city => itemCity.includes(city));
         return matchesEquipmentType && matchesCity && (activeCategory === 'all' || item.category === activeCategory) && (!showSaved || saved.has(item.id));
-      });
+      }).sort((left, right) => isRegionalSearch
+        ? Number(isCurrentlyFeatured(right)) - Number(isCurrentlyFeatured(left))
+        : 0);
       document.querySelector('#equipment-title').textContent = showSaved ? 'Saved equipment' : 'Available machines';
       document.querySelector('#results-count').textContent = `${matches.length} machine${matches.length === 1 ? '' : 's'} listed · availability and rates shown in Philippine pesos`;
       if (!matches.length) {
@@ -290,10 +564,16 @@ const equipment = [
         return;
       }
       grid.innerHTML = matches.map((item, index) => `
-        <article class="equipment-card" style="--card-index:${index}">
+        <article class="equipment-card ${isCurrentlyFeatured(item) ? 'featured' : ''}" style="--card-index:${index}">
           <div class="card-image">
             <img src="${escapeHTML(item.images?.[0] || item.image)}" alt="${escapeHTML(item.type)} available for rent" loading="lazy">
-            <span class="badge availability-badge ${item.status === 'ON_SITE' ? 'onsite' : item.status === 'MAINTENANCE' ? 'maintenance' : 'available'}">${item.status === 'ON_SITE' ? `On Site until ${formatAvailabilityDate(item.nextAvailableDate)}` : item.status === 'MAINTENANCE' ? 'Maintenance' : 'Available Now'}</span>
+            <span class="badge availability-badge ${item.status === 'ON_SITE' && availabilityDateISO(item.nextAvailableDate) ? 'onsite' : item.status === 'MAINTENANCE' ? 'maintenance' : 'available'}">${item.status === 'ON_SITE' && !availabilityDateISO(item.nextAvailableDate)
+              ? 'On site · Return date to be confirmed'
+              : item.status === 'ON_SITE'
+                ? `On site until ${formatAvailabilityDate(item.nextAvailableDate)} • Pre-bookable starting ${formatBookingDate(dayAfterISO(item.nextAvailableDate))}`
+                : item.status === 'MAINTENANCE'
+                  ? 'Maintenance'
+                  : 'Available Now'}</span>
             <button
               class="save-button ${saved.has(item.id) ? 'saved' : ''}"
               type="button"
@@ -304,17 +584,16 @@ const equipment = [
           </div>
           <div class="card-body">
             <div class="card-type">${escapeHTML(item.type)} · ${escapeHTML(item.location)}</div>
-            <span class="equipment-tag">${escapeHTML(item.badge)}</span>
             <div class="card-title-row">
               <h3>${escapeHTML(item.name)}</h3>
-              <span class="rating"><b>★</b> ${escapeHTML(item.rating)} (${item.reviews})</span>
+              <div class="card-title-meta">${isCurrentlyFeatured(item) ? '<span class="featured-badge">FEATURED</span>' : ''}<span class="rating"><b>★</b> ${escapeHTML(item.rating)} (${item.reviews})</span></div>
             </div>
             <div class="card-meta">
               <span>Delivery ${peso(item.baseDeliveryFee)} + ${peso(item.ratePerKm)}/km one way</span>
             </div>
             <div class="card-footer">
               <div class="price"><strong>${peso(item.hourly)}</strong> <small>/ hour</small></div>
-              <button class="detail-button" type="button" data-detail="${item.id}">Request machine</button>
+              <button class="detail-button" type="button" data-detail="${item.id}">Request Booking</button>
             </div>
           </div>
         </article>`).join('');
@@ -325,7 +604,8 @@ const equipment = [
         PENDING_APPROVAL: 'Pending approval',
         AWAITING_PAYMENT: 'Awaiting payment',
         PAID_IN_ESCROW: 'Paid in escrow',
-        COMPLETED: 'Completed'
+        COMPLETED: 'Completed',
+        DECLINED: 'Declined'
       };
       document.querySelector('#booking-rows').innerHTML = bookings.map(booking => `
         <tr>
@@ -333,8 +613,8 @@ const equipment = [
           <td>${escapeHTML(booking.renter)}</td>
           <td>${escapeHTML(booking.location)}</td>
           <td>${escapeHTML(booking.schedule)}</td>
-          <td><span class="status-pill ${booking.status === 'PENDING_APPROVAL' ? 'pending' : booking.status === 'PAID_IN_ESCROW' ? 'onsite' : booking.status === 'COMPLETED' ? 'completed' : ''}">${statusLabels[booking.status]}</span></td>
-          <td>${booking.status === 'PENDING_APPROVAL' ? `<button class="approve-booking-button" type="button" data-approve-booking="${booking.id}">Approve booking</button>` : '—'}</td>
+          <td><span class="status-pill ${booking.status === 'PENDING_APPROVAL' ? 'pending' : booking.status === 'PAID_IN_ESCROW' ? 'onsite' : booking.status === 'COMPLETED' ? 'completed' : booking.status === 'DECLINED' ? 'declined' : ''}">${statusLabels[booking.status] || escapeHTML(booking.status)}</span></td>
+          <td>${booking.status === 'PENDING_APPROVAL' ? `<div class="booking-actions"><button class="approve-booking-button" type="button" data-approve-booking="${booking.id}">Approve</button><button class="decline-booking-button" type="button" data-decline-booking="${booking.id}">Decline</button></div>` : '—'}</td>
         </tr>`).join('');
     }
 
@@ -353,7 +633,10 @@ const equipment = [
             baseDeliveryFee: Number(record.baseDeliveryFee),
             ratePerKm: Number(record.ratePerKm),
             status: record.status,
-            nextAvailableDate: availabilityDateISO(record.nextAvailableDate)
+            nextAvailableDate: availabilityDateISO(record.nextAvailableDate),
+            isFeatured: record.isFeatured === true && (!record.featureExpiresAt || Date.parse(record.featureExpiresAt) > Date.now()),
+            boostRegion: record.boostRegion || null,
+            featureExpiresAt: record.featureExpiresAt || null
           });
         }
         persistedEquipmentLoaded = true;
@@ -430,13 +713,26 @@ const equipment = [
 
     function persistMockBookings() {
       try {
-        sessionStorage.setItem(
+        localStorage.setItem(
           'bigboys-mock-bookings',
           JSON.stringify(bookings.filter(booking => booking.isMock === true))
         );
       } catch (error) {
-        console.error('Unable to persist mock bookings for the PayMongo return flow:', error);
-        notify('This browser could not save the mock booking for payment return. Keep this tab open until checkout finishes.');
+        console.error('Unable to persist mock bookings:', error);
+        notify('This browser could not save the mock booking or its payment status.');
+      }
+    }
+
+    function persistBookingPaymentState(booking) {
+      try {
+        const paymentState = JSON.parse(localStorage.getItem('bigboys-payment-state') || '{}');
+        const key = booking.apiBookingId || booking.mockBookingId;
+        if (!key) return;
+        paymentState[key] = { status: booking.status, updatedAt: new Date().toISOString() };
+        localStorage.setItem('bigboys-payment-state', JSON.stringify(paymentState));
+      } catch (error) {
+        console.error('Unable to persist booking payment state:', error);
+        notify('Payment was confirmed, but its local status could not be saved.');
       }
     }
 
@@ -453,7 +749,9 @@ const equipment = [
             ? 'Payment due'
             : booking.status === 'PAID_IN_ESCROW'
               ? 'Paid in escrow'
-              : 'Completed';
+              : booking.status === 'DECLINED'
+                ? 'Declined'
+                : 'Completed';
         return `
           <article class="checkout-booking-card">
             <div><span class="section-kicker">${escapeHTML(label)}</span><h3>${escapeHTML(booking.machine)}</h3><p>${escapeHTML(booking.schedule)} · ${escapeHTML(booking.location)}</p></div>
@@ -536,15 +834,87 @@ const equipment = [
             <span class="fleet-status ${item.status === 'ON_SITE' ? 'on-rent' : item.status === 'MAINTENANCE' ? 'maintenance' : ''}">${item.status === 'ON_SITE' ? `On site until ${formatAvailabilityDate(item.nextAvailableDate)}` : item.status === 'MAINTENANCE' ? 'Maintenance' : 'Available now'}</span>
             <span class="fleet-meta">${peso(item.baseDeliveryFee)} delivery · ${peso(item.ratePerKm)}/km</span>
             <button class="fleet-edit-button" type="button" data-edit-equipment="${item.id}">Edit equipment</button>
+            <button class="feature-boost-button" type="button" data-feature-equipment="${item.id}" ${isCurrentlyFeatured(item) ? 'disabled' : ''}>${isCurrentlyFeatured(item) ? 'FEATURED' : 'Boost / Feature · ₱299'}</button>
           </div>
         </article>`).join('');
     }
 
+    function openFeatureCheckout(machine) {
+      if (!machine) return;
+      if (isCurrentlyFeatured(machine)) {
+        notify(`${machine.name} is already featured.`);
+        return;
+      }
+      activeFeatureMachine = machine;
+      document.querySelector('#feature-checkout-machine').textContent = machine.name;
+      document.querySelector('#feature-checkout-message').hidden = true;
+      document.querySelector('#feature-checkout-message').textContent = '';
+      document.querySelector('#feature-checkout-button').disabled = false;
+      document.querySelector('#feature-checkout-dialog').showModal();
+    }
+
+    async function beginFeatureCheckout() {
+      const machine = activeFeatureMachine;
+      if (!machine) return;
+      const button = document.querySelector('#feature-checkout-button');
+      const message = document.querySelector('#feature-checkout-message');
+      button.disabled = true;
+      try {
+        if (window.location.protocol === 'file:') {
+          throw new Error('To pay for a listing boost, start the API with `npm start` and open http://localhost:3000.');
+        }
+        const apiEquipmentId = machine.apiEquipmentId || `local-${machine.id}`;
+        const response = await fetch(`/api/equipment/${encodeURIComponent(apiEquipmentId)}/feature-checkout-session`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            ownerId: machine.apiOwnerId || 'demo-owner',
+            localEquipment: machine.apiEquipmentId ? undefined : {
+              name: machine.name,
+              hourlyRate: machine.hourly,
+              baseDeliveryFee: machine.baseDeliveryFee,
+              ratePerKm: machine.ratePerKm,
+              status: machine.status,
+              nextAvailableDate: machine.nextAvailableDate
+            }
+          })
+        });
+        const result = await readApiResponse(response, 'Unable to start listing feature checkout.');
+        if (result.featured) {
+          machine.isFeatured = true;
+          machine.boostRegion = result.equipment.boostRegion;
+          machine.featureExpiresAt = result.equipment.featureExpiresAt;
+          persistFeaturedEquipment(machine);
+          render();
+          renderOwnerFleet();
+          document.querySelector('#feature-checkout-dialog').close();
+          notify(`${machine.name} is now featured.`);
+          return;
+        }
+        if (!result.checkout_url) throw new Error('The payment service did not return a checkout URL.');
+        localStorage.setItem('bigboys-feature-return', JSON.stringify({
+          machineId: machine.id,
+          apiEquipmentId,
+          ownerId: machine.apiOwnerId || 'demo-owner'
+        }));
+        window.location.href = result.checkout_url;
+      } catch (error) {
+        message.textContent = error.message || 'Unable to start listing feature checkout.';
+        message.hidden = false;
+        button.disabled = false;
+      }
+    }
+
     function transitionTo(target) {
-      const current = [document.querySelector('#login-view'), document.querySelector('#contractor-view'), document.querySelector('#owner-view'), document.querySelector('#admin-view')].find(view => !view.hidden);
-      if (current === target) return;
-      if (current) current.hidden = true;
+      const views = [loginView, contractorView, ownerView, adminView];
+      if (views.every(view => view === target ? !view.hidden : view.hidden)) return;
+      for (const view of views) {
+        if (view !== target) view.hidden = true;
+      }
+      loginView.classList.remove('is-contextual');
       target.hidden = false;
+      appHeader.hidden = target !== contractorView && target !== ownerView;
+      updateAppHeader();
       target.classList.remove('view-entering');
       void target.offsetWidth;
       target.classList.add('view-entering');
@@ -557,22 +927,15 @@ const equipment = [
     function showWorkspace(role, email) {
       signedInRole = role;
       signedInEmail = email;
-      updateContractorHeader();
-      if (role === 'owner') {
-        document.querySelector('#owner-account-email').textContent = email;
-        document.querySelector('#owner-first-name').textContent = email.split('@')[0].split(/[._-]/)[0] || 'Owner';
-        renderOwnerFleet();
-        renderBookings();
-        equipmentLoadPromise.then(() => loadPersistedBookings('owner'));
-      }
+      updateAppHeader();
       if (role === 'admin') {
         document.querySelector('#admin-account-email').textContent = email;
         loadAdminLedger();
-      } else if (role === 'contractor') {
+      } else {
         renderContractorBookings();
         equipmentLoadPromise.then(() => loadPersistedBookings('renter'));
       }
-      transitionTo(role === 'owner' ? ownerView : role === 'admin' ? adminView : contractorView);
+      transitionTo(role === 'admin' ? adminView : contractorView);
       const action = pendingListingAction;
       pendingListingAction = null;
       if (role !== 'contractor' || !action) return;
@@ -580,13 +943,33 @@ const equipment = [
       if (!machine) return;
       if (action.type === 'save') {
         saved.add(machine.id);
-        document.querySelector('#saved-count').textContent = saved.size;
+        persistSavedEquipment();
+        renderAccountMenus();
         render();
         notify(`${machine.name} saved.`);
       } else {
         openBooking(machine);
       }
     }
+
+    function showOwnerDashboard() {
+      if (signedInRole !== 'contractor') return;
+      setMobileNavOpen(false);
+      document.querySelector('#owner-first-name').textContent = signedInEmail.split('@')[0].split(/[._-]/)[0] || 'Owner';
+      renderOwnerFleet();
+      renderBookings();
+      equipmentLoadPromise.then(() => loadPersistedBookings('owner'));
+      transitionTo(ownerView);
+      renderAccountMenus();
+    }
+
+    ownerModeSwitch.addEventListener('click', showOwnerDashboard);
+    renterModeSwitch.addEventListener('click', () => {
+      if (signedInRole === 'contractor') {
+        transitionTo(contractorView);
+        renderAccountMenus();
+      }
+    });
 
     function openCheckout(booking) {
       activeCheckoutBooking = booking;
@@ -645,28 +1028,27 @@ const equipment = [
       const availabilityMessage = document.querySelector('#booking-availability');
       const blockedBookings = bookings.filter(booking =>
         booking.equipmentId === selectedMachine.id
-        && booking.status === 'PAID_IN_ESCROW'
+        && ['PENDING_APPROVAL', 'AWAITING_PAYMENT', 'PAID_IN_ESCROW'].includes(booking.status)
         && booking.startDate
         && booking.endDate
       );
       let availabilityError = '';
+      const returnDate = availabilityDateISO(selectedMachine.nextAvailableDate);
+      const minimumStartDate = firstBookableDate(selectedMachine);
       if (selectedMachine.status === 'MAINTENANCE') {
         availabilityError = 'This machine is in maintenance and cannot be requested right now.';
       } else if (!startDate || !endDate) {
         availabilityError = 'Choose a start and end date to check availability.';
       } else if (endDate < startDate) {
         availabilityError = 'The end date must be on or after the start date.';
-      } else if (
-        selectedMachine.status === 'ON_SITE'
-        && (!availabilityDateISO(selectedMachine.nextAvailableDate) || startDate < availabilityDateISO(selectedMachine.nextAvailableDate))
-      ) {
-        availabilityError = selectedMachine.nextAvailableDate
-          ? `This machine is on site until ${formatAvailabilityDate(selectedMachine.nextAvailableDate)}. Choose that date or later.`
-          : 'This machine is currently on site and its next available date has not been confirmed.';
-      } else if (startDate < todayISO()) {
-        availabilityError = 'Choose a start date that is today or later.';
+      } else if (selectedMachine.status === 'ON_SITE' && !returnDate) {
+        availabilityError = 'This machine is currently on site and its return date has not been confirmed.';
+      } else if (startDate < minimumStartDate) {
+        availabilityError = selectedMachine.status === 'ON_SITE'
+          ? `This machine is on site until ${formatAvailabilityDate(returnDate)}. Pre-booking starts ${formatBookingDate(minimumStartDate)}.`
+          : `Choose a start date that is ${formatBookingDate(minimumStartDate)} or later.`;
       } else if (blockedBookings.some(booking => startDate <= booking.endDate && endDate >= booking.startDate)) {
-        availabilityError = 'Those dates overlap with an active on-site booking. Choose different dates.';
+        availabilityError = 'Those dates overlap with another booking request. Choose different dates.';
       }
       availabilityMessage.textContent = availabilityError;
       availabilityMessage.classList.remove('error');
@@ -699,10 +1081,8 @@ const equipment = [
       document.querySelector('#booking-miles').value = 10;
       const startDate = document.querySelector('#booking-start-date');
       const endDate = document.querySelector('#booking-end-date');
-      startDate.min = todayISO();
-      startDate.value = selectedMachine.status === 'ON_SITE' && selectedMachine.nextAvailableDate
-        ? availabilityDateISO(selectedMachine.nextAvailableDate)
-        : todayISO();
+      startDate.min = firstBookableDate(selectedMachine);
+      startDate.value = startDate.min;
       endDate.min = startDate.value;
       endDate.value = startDate.value;
       updateEstimate();
@@ -740,7 +1120,8 @@ const equipment = [
           return;
         }
         if (saved.has(id)) saved.delete(id); else saved.add(id);
-        document.querySelector('#saved-count').textContent = saved.size;
+        persistSavedEquipment();
+        renderAccountMenus();
         render();
         return;
       }
@@ -755,16 +1136,162 @@ const equipment = [
       }
     });
 
-    signInButton.addEventListener('click', () => openSignIn());
+    accountMenus.forEach(menu => menu.addEventListener('click', async event => {
+      const bell = event.target.closest('[data-menu-bell]');
+      if (bell) {
+        const opening = menu.querySelector('[data-menu-popover]').hidden;
+        accountMenus.forEach(otherMenu => {
+          otherMenu.querySelector('[data-menu-popover]').hidden = otherMenu !== menu || !opening;
+          otherMenu.querySelector('[data-menu-bell]').setAttribute('aria-expanded', String(otherMenu === menu && opening));
+        });
+        if (opening) selectMenuTab(menu, 'notifications');
+        return;
+      }
+
+      const tab = event.target.closest('[data-menu-tab]');
+      if (tab) {
+        selectMenuTab(menu, tab.dataset.menuTab);
+        return;
+      }
+
+      if (event.target.closest('[data-mark-read]')) {
+        const visibleIds = new Set(visibleNotifications().map(item => item.id));
+        notifications = notifications.map(item => visibleIds.has(item.id) ? { ...item, read: true } : item);
+        persistNotifications();
+        renderAccountMenus();
+        return;
+      }
+
+      const notification = event.target.closest('[data-notification-id]');
+      if (notification) {
+        const selectedNotification = notifications.find(item => item.id === notification.dataset.notificationId);
+        notifications = notifications.map(item => item.id === notification.dataset.notificationId ? { ...item, read: true } : item);
+        persistNotifications();
+        renderAccountMenus();
+        if (selectedNotification?.recipientRole === 'renter' && selectedNotification.bookingId !== undefined) {
+          if (selectedNotification.apiBookingId && window.location.protocol !== 'file:') {
+            await loadPersistedBookings('renter');
+          }
+          const booking = bookings.find(item => selectedNotification.apiBookingId
+            ? String(item.apiBookingId) === String(selectedNotification.apiBookingId)
+            : String(item.id) === String(selectedNotification.bookingId));
+          if (booking?.status === 'AWAITING_PAYMENT') {
+            menu.querySelector('[data-menu-popover]').hidden = true;
+            menu.querySelector('[data-menu-bell]').setAttribute('aria-expanded', 'false');
+            openCheckout(booking);
+          } else {
+            notify('This booking is not ready for payment yet.');
+          }
+        }
+        return;
+      }
+
+      const removeSaved = event.target.closest('[data-saved-remove]');
+      if (removeSaved) {
+        saved.delete(Number(removeSaved.dataset.savedRemove));
+        persistSavedEquipment();
+        renderAccountMenus();
+        render();
+        return;
+      }
+
+      const bookSaved = event.target.closest('[data-saved-book]');
+      if (bookSaved) {
+        const machine = equipment.find(item => item.id === Number(bookSaved.dataset.savedBook));
+        menu.querySelector('[data-menu-popover]').hidden = true;
+        menu.querySelector('[data-menu-bell]').setAttribute('aria-expanded', 'false');
+        if (machine) openBooking(machine);
+        return;
+      }
+    }));
+
+    function selectMenuTab(menu, selectedTab) {
+      menu.querySelectorAll('[data-menu-tab]').forEach(tab => {
+        const active = tab.dataset.menuTab === selectedTab;
+        tab.classList.toggle('active', active);
+        tab.setAttribute('aria-selected', String(active));
+      });
+      menu.querySelectorAll('[data-menu-panel]').forEach(panel => {
+        panel.hidden = panel.dataset.menuPanel !== selectedTab;
+      });
+    }
+
+    function setMobileNavOpen(isOpen) {
+      appTopbar.classList.toggle('mobile-menu-open', isOpen);
+      mobileMenuToggle.setAttribute('aria-expanded', String(isOpen));
+      mobileMenuToggle.setAttribute('aria-label', isOpen ? 'Close navigation menu' : 'Open navigation menu');
+    }
+
+    mobileMenuToggle.addEventListener('click', () => {
+      setMobileNavOpen(!appTopbar.classList.contains('mobile-menu-open'));
+    });
+    document.querySelectorAll('#mobile-nav-drawer .nav-links a').forEach(link => {
+      link.addEventListener('click', () => setMobileNavOpen(false));
+    });
+    signInButton.addEventListener('click', () => {
+      setMobileNavOpen(false);
+      openSignIn();
+    });
+    ownerModeSwitch.addEventListener('click', () => setMobileNavOpen(false));
+    renterModeSwitch.addEventListener('click', () => setMobileNavOpen(false));
+    signOutButton.addEventListener('click', () => setMobileNavOpen(false));
+
+    document.addEventListener('click', event => {
+      if (event.target.closest('[data-account-menu]')) return;
+      accountMenus.forEach(menu => {
+        menu.querySelector('[data-menu-popover]').hidden = true;
+        menu.querySelector('[data-menu-bell]').setAttribute('aria-expanded', 'false');
+      });
+      if (!event.target.closest('#app-topbar')) setMobileNavOpen(false);
+    });
+
+    document.addEventListener('keydown', event => {
+      if (event.key !== 'Escape') return;
+      accountMenus.forEach(menu => {
+        menu.querySelector('[data-menu-popover]').hidden = true;
+        menu.querySelector('[data-menu-bell]').setAttribute('aria-expanded', 'false');
+      });
+      setMobileNavOpen(false);
+    });
+
+    window.addEventListener('storage', event => {
+      if (event.key === 'bigboys-saved-equipment') {
+        saved.clear();
+        loadSavedEquipment();
+        renderAccountMenus();
+        render();
+      } else if (event.key === 'bigboys-notifications') {
+        loadNotifications();
+        renderAccountMenus();
+      }
+    });
+
     document.querySelector('#login-back').addEventListener('click', () => {
       pendingListingAction = null;
+      contextualSignIn = false;
       transitionTo(contractorView);
+    });
+    document.querySelector('#login-close').addEventListener('click', () => {
+      if (!contextualSignIn) {
+        pendingListingAction = null;
+        transitionTo(contractorView);
+        return;
+      }
+      pendingListingAction = null;
+      contextualSignIn = false;
+      loginView.classList.remove('is-contextual');
+      loginView.hidden = true;
+    });
+    document.querySelector('#admin-portal-link').addEventListener('click', event => {
+      event.preventDefault();
+      openSignIn();
+      document.querySelector('#login-email').value = 'admin@bigboys.com';
+      document.querySelector('#login-password').focus();
     });
 
     searchForm.addEventListener('submit', event => {
       event.preventDefault();
       showSaved = false;
-      document.querySelector('#saved-link').setAttribute('aria-current', 'false');
       render();
       document.querySelector('#equipment').scrollIntoView({ behavior: 'smooth', block: 'start' });
     });
@@ -780,12 +1307,6 @@ const equipment = [
     });
     document.querySelector('#reset-link').addEventListener('click', () => {
       activeCategory = 'all'; showSaved = false; equipmentFilter.value = 'all'; homeAreaInput.value = ''; nearbyAreasInput.checked = false; localStorage.removeItem('bigboys-home-area');
-      document.querySelectorAll('.category').forEach((button, index) => { button.classList.toggle('active', index === 0); button.setAttribute('aria-pressed', String(index === 0)); });
-      render();
-    });
-    document.querySelector('#saved-link').addEventListener('click', () => {
-      showSaved = !showSaved;
-      activeCategory = 'all';
       document.querySelectorAll('.category').forEach((button, index) => { button.classList.toggle('active', index === 0); button.setAttribute('aria-pressed', String(index === 0)); });
       render();
     });
@@ -809,6 +1330,8 @@ const equipment = [
       try {
         await equipmentLoadPromise;
         const distanceKm = Number(document.querySelector('#booking-miles').value);
+        const financials = getBookingFinancials(selectedMachine, hours, distanceKm);
+        const isFuturePreBooking = startDate > todayISO();
         if (persistedEquipmentLoaded && selectedMachine.apiEquipmentId) {
           const response = await fetch('/api/bookings', {
             method: 'POST',
@@ -857,7 +1380,11 @@ const equipment = [
         }
         renderBookings();
         renderContractorBookings();
-        notify(`Booking request added for ${selectedMachine.name}. It is pending owner approval.`);
+        const bookingStatus = isFuturePreBooking ? 'Pending Future Pre-Booking · ' : '';
+        const notification = `${bookingStatus}Booking Pending Owner Approval: ${selectedMachine.name} · ${hours} hrs · ${formatBookingDate(startDate)}–${formatBookingDate(endDate)} · Total ${peso(Math.round(financials.grossTotal * 100) / 100)}`;
+        addNotification('owner', notification);
+        addNotification('renter', notification, signedInEmail);
+        notify('Booking request sent to owner!');
         dialog.close();
       } catch (error) {
         showBookingError(error.message || 'Unable to create the booking.');
@@ -868,30 +1395,41 @@ const equipment = [
 
     document.querySelector('#booking-rows').addEventListener('click', async event => {
       const approveButton = event.target.closest('[data-approve-booking]');
-      if (!approveButton) return;
-      const booking = bookings.find(item => item.id === Number(approveButton.dataset.approveBooking));
+      const declineButton = event.target.closest('[data-decline-booking]');
+      if (!approveButton && !declineButton) return;
+      const bookingId = Number(approveButton?.dataset.approveBooking || declineButton?.dataset.declineBooking);
+      const booking = bookings.find(item => item.id === bookingId);
       if (!booking || booking.status !== 'PENDING_APPROVAL') return;
-      approveButton.disabled = true;
+      const decision = approveButton ? 'approve' : 'decline';
+      const actionButton = approveButton || declineButton;
+      actionButton.disabled = true;
       try {
         if (booking.apiBookingId) {
           const machine = equipment.find(item => item.id === booking.equipmentId);
-          const response = await fetch(`/api/bookings/${encodeURIComponent(booking.apiBookingId)}/approve`, {
+          const response = await fetch(`/api/bookings/${encodeURIComponent(booking.apiBookingId)}/${decision}`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ ownerId: machine?.apiOwnerId || 'demo-owner' })
           });
-          const result = await readApiResponse(response, 'Unable to approve this booking.');
+          const result = await readApiResponse(response, `Unable to ${decision} this booking.`);
           booking.status = result.booking.bookingStatus;
         } else {
-          booking.status = 'AWAITING_PAYMENT';
+          booking.status = decision === 'approve' ? 'AWAITING_PAYMENT' : 'DECLINED';
           persistMockBookings();
         }
         renderBookings();
         renderContractorBookings();
-        notify('Booking approved. The renter can now proceed to payment.');
+        const machineName = booking.machine;
+        if (decision === 'approve') {
+          addNotification('renter', `Booking Approved - Tap to Pay: Your request for ${machineName} has been confirmed by the owner`, booking.renterEmail, booking.id, booking.apiBookingId || null);
+          notify('Booking approved. The renter can now proceed to payment.');
+        } else {
+          addNotification('renter', `Booking Declined: Your request for ${machineName} was declined by the owner`, booking.renterEmail);
+          notify('Booking declined. The renter has been notified.');
+        }
       } catch (error) {
-        notify(error.message || 'Unable to approve this booking.');
-        approveButton.disabled = false;
+        notify(error.message || `Unable to ${decision} this booking.`);
+        actionButton.disabled = false;
       }
     });
 
@@ -911,10 +1449,6 @@ const equipment = [
       if (!activeCheckoutBooking) return;
       const apiBookingId = activeCheckoutBooking.apiBookingId;
       if (!apiBookingId) {
-        if (activeCheckoutBooking.isMock !== true) {
-          showCheckoutMessage('This booking is not linked to a PayMongo-ready API record.', true);
-          return;
-        }
         button.disabled = true;
         try {
           if (window.location.protocol === 'file:') {
@@ -928,7 +1462,11 @@ const equipment = [
               bookingId: activeCheckoutBooking.mockBookingId,
               equipmentId: activeCheckoutBooking.equipmentId,
               rentalHours: activeCheckoutBooking.rentalHours,
-              distanceKm: activeCheckoutBooking.distanceKm
+              distanceKm: activeCheckoutBooking.distanceKm,
+              equipmentName: activeCheckoutBooking.machine,
+              hourlyRate: equipment.find(item => item.id === activeCheckoutBooking.equipmentId)?.hourly,
+              baseDeliveryFee: activeCheckoutBooking.baseDeliveryFee,
+              ratePerKm: equipment.find(item => item.id === activeCheckoutBooking.equipmentId)?.ratePerKm
             })
           });
           const result = await readApiResponse(response, 'Unable to start PayMongo checkout.');
@@ -1037,43 +1575,88 @@ const equipment = [
     });
 
     function resetEquipmentForm() {
-      const form = document.querySelector('#owner-form');
       editingEquipmentId = null;
-      form.reset();
+      ownerForm.reset();
       uploadedPhotos = [];
       renderPhotoPreviews();
       updatePayoutPreview();
       document.querySelector('#owner-title').textContent = 'List your machine';
       document.querySelector('#machine-submit').textContent = 'Add machine to fleet';
       document.querySelector('#cancel-machine-edit').hidden = true;
+      document.querySelector('#delete-machine-button').hidden = true;
+      document.querySelector('#edit-feature-section').hidden = true;
+      document.querySelector('#edit-feature-button').disabled = false;
     }
 
     document.querySelector('#fleet-grid').addEventListener('click', event => {
+      const featureButton = event.target.closest('[data-feature-equipment]');
+      if (featureButton) {
+        openFeatureCheckout(equipment.find(item => item.id === Number(featureButton.dataset.featureEquipment)));
+        return;
+      }
       const editButton = event.target.closest('[data-edit-equipment]');
       if (!editButton) return;
       const machine = equipment.find(item => item.id === Number(editButton.dataset.editEquipment));
       if (!machine) return;
       editingEquipmentId = machine.id;
-      const form = document.querySelector('#owner-form');
-      form.elements.name.value = machine.name;
-      if (![...form.elements.type.options].some(option => option.value === machine.type)) {
-        form.elements.type.add(new Option(machine.type, machine.type), 0);
+      ownerForm.elements.name.value = machine.name;
+      if (![...ownerForm.elements.type.options].some(option => option.value === machine.type)) {
+        ownerForm.elements.type.add(new Option(machine.type, machine.type), 0);
       }
-      form.elements.type.value = machine.type;
-      form.elements.location.value = machine.location;
-      form.elements.hourly.value = machine.hourly;
-      form.elements.baseDeliveryFee.value = machine.baseDeliveryFee;
-      form.elements.ratePerKm.value = machine.ratePerKm;
-      form.elements.specs.value = machine.description;
+      ownerForm.elements.type.value = machine.type;
+      ownerForm.elements.location.value = machine.location;
+      ownerForm.elements.hourly.value = machine.hourly;
+      ownerForm.elements.baseDeliveryFee.value = machine.baseDeliveryFee;
+      ownerForm.elements.ratePerKm.value = machine.ratePerKm;
+      ownerForm.elements.specs.value = machine.description;
       uploadedPhotos = getMachinePhotos(machine).slice();
       renderPhotoPreviews();
       document.querySelector('#owner-title').textContent = 'Edit your machine';
       document.querySelector('#machine-submit').textContent = 'Save equipment changes';
       document.querySelector('#cancel-machine-edit').hidden = false;
+      document.querySelector('#delete-machine-button').hidden = false;
+      document.querySelector('#edit-feature-section').hidden = false;
+      document.querySelector('#edit-feature-button').dataset.featureEquipment = String(machine.id);
+      document.querySelector('#edit-feature-button').disabled = isCurrentlyFeatured(machine);
+      document.querySelector('#edit-feature-button').textContent = isCurrentlyFeatured(machine) ? 'FEATURED' : 'Boost / Feature';
       updatePayoutPreview();
-      document.querySelector('#owner-add-machine').scrollIntoView({ behavior: 'smooth', block: 'start' });
+      editFormSlot.append(ownerForm);
+      editEquipmentDialog.showModal();
     });
-    document.querySelector('#cancel-machine-edit').addEventListener('click', resetEquipmentForm);
+    document.querySelector('#cancel-machine-edit').addEventListener('click', () => editEquipmentDialog.close());
+    document.querySelector('#edit-equipment-close').addEventListener('click', () => editEquipmentDialog.close());
+    document.querySelector('#edit-feature-button').addEventListener('click', event => {
+      openFeatureCheckout(equipment.find(item => item.id === Number(event.currentTarget.dataset.featureEquipment)));
+    });
+    document.querySelector('#feature-checkout-button').addEventListener('click', beginFeatureCheckout);
+    document.querySelector('#feature-checkout-close').addEventListener('click', () => document.querySelector('#feature-checkout-dialog').close());
+    document.querySelector('#feature-checkout-dialog').addEventListener('click', event => {
+      if (event.target === event.currentTarget) event.currentTarget.close();
+    });
+    editEquipmentDialog.addEventListener('close', () => {
+      ownerFormSlot.append(ownerForm);
+      if (editingEquipmentId !== null) resetEquipmentForm();
+    });
+    document.querySelector('#delete-machine-button').addEventListener('click', () => {
+      const machine = equipment.find(item => item.id === editingEquipmentId);
+      if (!machine) return;
+      const confirmed = window.confirm(`Are you sure you want to permanently remove ${machine.name} from your fleet? This action cannot be undone.`);
+      if (!confirmed) return;
+      const machineIndex = equipment.findIndex(item => item.id === machine.id);
+      if (machineIndex < 0) {
+        notify('This listing could not be found and was not removed.');
+        return;
+      }
+      equipment.splice(machineIndex, 1);
+      persistLocalEquipment();
+      if (saved.delete(machine.id)) persistSavedEquipment();
+      resetEquipmentForm();
+      editEquipmentDialog.close();
+      renderAccountMenus();
+      render();
+      renderOwnerFleet();
+      notify(`${machine.name} was removed from your fleet.`);
+    });
 
     function updatePayoutPreview() {
       const hourly = Number(document.querySelector('#machine-hourly').value) || 0;
@@ -1114,6 +1697,7 @@ const equipment = [
       };
       if (isEditing) {
         Object.assign(editingMachine, updatedFields);
+        if (editingMachine.localOnly) persistLocalEquipment();
       } else {
         equipment.unshift({
           id: Math.max(...equipment.map(item => item.id)) + 1,
@@ -1121,11 +1705,15 @@ const equipment = [
           rating: 'New',
           reviews: 0,
           badge: 'New listing',
+          localOnly: true,
+          isFeatured: false,
           status: 'AVAILABLE',
           nextAvailableDate: null
         });
+        persistLocalEquipment();
       }
       resetEquipmentForm();
+      if (editEquipmentDialog.open) editEquipmentDialog.close();
       activeCategory = 'all';
       render();
       renderOwnerFleet();
@@ -1144,34 +1732,75 @@ const equipment = [
       updateDialogPhoto();
     });
 
-    document.querySelector('#login-form').addEventListener('submit', event => {
+    document.querySelector('#login-form').addEventListener('submit', async event => {
       event.preventDefault();
       const formData = new FormData(event.currentTarget);
       const email = String(formData.get('email')).trim();
-      const role = String(formData.get('role'));
+      const password = String(formData.get('password'));
+      const isAdminEmail = email.toLowerCase() === 'admin@bigboys.com';
+      const message = document.querySelector('#login-message');
+      let role = 'contractor';
+      if (isAdminEmail) {
+        try {
+          if (window.location.protocol === 'file:') {
+            throw new Error('Admin sign-in requires the API server. Open the app at http://localhost:3000.');
+          }
+          const response = await fetch('/api/auth/admin/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, password })
+          });
+          const result = await readApiResponse(response, 'Unable to sign in to the admin portal.');
+          if (result.role !== 'admin') {
+            throw new Error('The admin sign-in service returned an invalid account role.');
+          }
+          role = result.role;
+        } catch (error) {
+          message.textContent = error.message || 'Unable to sign in to the admin portal.';
+          message.hidden = false;
+          return;
+        }
+      }
+      message.hidden = true;
       if (document.querySelector('#remember-me').checked) localStorage.setItem('bigboys-remembered-email', email);
       else localStorage.removeItem('bigboys-remembered-email');
+      contextualSignIn = false;
       showWorkspace(role, email);
     });
 
-    document.querySelectorAll('[data-signout]').forEach(button => button.addEventListener('click', () => {
+    document.querySelectorAll('[data-signout]').forEach(button => button.addEventListener('click', async () => {
+      if (signedInRole === 'admin' && window.location.protocol !== 'file:') {
+        try {
+          const response = await fetch('/api/auth/admin/logout', { method: 'POST' });
+          if (!response.ok) throw new Error(`Admin sign-out failed (HTTP ${response.status}).`);
+        } catch (error) {
+          notify(error.message || 'Unable to sign out of the admin portal.');
+        }
+      }
       document.querySelector('#login-password').value = '';
       signedInRole = '';
+      signedInEmail = '';
       pendingListingAction = null;
+      contextualSignIn = false;
       showSaved = false;
-      updateContractorHeader();
+      updateAppHeader();
       render();
       transitionTo(contractorView);
     }));
 
     const rememberedEmail = localStorage.getItem('bigboys-remembered-email');
     homeAreaInput.value = localStorage.getItem('bigboys-home-area') || '';
+    loadSavedEquipment();
+    loadLocalEquipment();
+    loadFeaturedEquipment();
+    loadNotifications();
     if (rememberedEmail) {
       document.querySelector('#login-email').value = rememberedEmail;
       document.querySelector('#remember-me').checked = true;
     }
 
-    updateContractorHeader();
+    updateAppHeader();
+    renderAccountMenus();
     render();
     renderBookings();
     renderOwnerFleet();
@@ -1197,6 +1826,7 @@ const equipment = [
               const localBooking = bookings.find(booking => booking.apiBookingId === returnedBookingId);
               if (localBooking) {
                 localBooking.status = 'PAID_IN_ESCROW';
+                persistBookingPaymentState(localBooking);
                 renderContractorBookings();
                 renderAdminLedger();
               }
@@ -1227,6 +1857,7 @@ const equipment = [
             const result = await readApiResponse(response, 'Unable to verify the PayMongo Sandbox payment.');
             if (result.bookingStatus === 'PAID_IN_ESCROW') {
               localBooking.status = 'PAID_IN_ESCROW';
+              persistBookingPaymentState(localBooking);
               const machine = equipment.find(item => item.id === localBooking.equipmentId);
               if (machine) {
                 machine.status = 'ON_SITE';
@@ -1254,4 +1885,46 @@ const equipment = [
       }
     } else if (paymentReturn === 'mock_cancelled') {
       notify('PayMongo checkout was cancelled. Your mock booking is still awaiting payment.');
+    }
+    if (paymentReturn === 'feature_submitted') {
+      try {
+        const pendingFeature = JSON.parse(localStorage.getItem('bigboys-feature-return') || 'null');
+        const returnedEquipmentId = new URLSearchParams(window.location.search).get('equipmentId');
+        if (!pendingFeature || String(pendingFeature.apiEquipmentId) !== String(returnedEquipmentId)) {
+          throw new Error('The listing boost could not be matched to this checkout return.');
+        }
+        const confirmFeaturePayment = async remainingChecks => {
+          try {
+            const response = await fetch(`/api/equipment/${encodeURIComponent(pendingFeature.apiEquipmentId)}/feature-status?ownerId=${encodeURIComponent(pendingFeature.ownerId)}`);
+            const result = await readApiResponse(response, 'Unable to verify listing boost payment.');
+            if (result.featured === true) {
+              const machine = equipment.find(item => item.id === pendingFeature.machineId);
+              if (!machine) throw new Error('The featured listing is no longer in the current equipment catalog.');
+              machine.isFeatured = true;
+              machine.boostRegion = result.equipment.boostRegion;
+              machine.featureExpiresAt = result.equipment.featureExpiresAt;
+              persistFeaturedEquipment(machine);
+              render();
+              renderOwnerFleet();
+              localStorage.removeItem('bigboys-feature-return');
+              notify(`${machine.name} is featured in Davao Region for 30 days.`);
+              return;
+            }
+            if (remainingChecks > 0) {
+              window.setTimeout(() => confirmFeaturePayment(remainingChecks - 1), 2000);
+            } else {
+              notify('Listing boost payment is still processing. The feature will activate after PayMongo confirms payment.');
+            }
+          } catch (error) {
+            notify(error.message || 'Unable to verify listing boost payment.');
+          }
+        };
+        confirmFeaturePayment(5);
+      } catch (error) {
+        console.error('Unable to verify listing feature return:', error);
+        notify(error.message || 'Unable to verify listing boost payment.');
+      }
+    } else if (paymentReturn === 'feature_cancelled') {
+      localStorage.removeItem('bigboys-feature-return');
+      notify('Listing boost checkout was cancelled. The listing was not featured.');
     }

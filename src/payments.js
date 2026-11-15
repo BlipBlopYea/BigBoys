@@ -1,12 +1,15 @@
-import { createHmac, timingSafeEqual } from 'node:crypto';
+import { createHmac, randomUUID, timingSafeEqual } from 'node:crypto';
 import { Prisma } from '@prisma/client';
 import { Router } from 'express';
+import { requireAdmin } from './admin-auth.js';
 import { ApiError } from './bookings.js';
 import { calculateBookingFinancials } from './booking-financials.js';
 import { demoEquipment } from './demo-equipment.js';
 
 const PAYMONGO_API_URL = 'https://api.paymongo.com/v1';
 const MAX_SIGNATURE_AGE_SECONDS = 300;
+const FEATURE_LISTING_PRICE_PHP = 299;
+const FEATURE_LISTING_DURATION_DAYS = 30;
 
 function asyncHandler(handler) {
   return (req, res, next) => Promise.resolve(handler(req, res, next)).catch(next);
@@ -37,25 +40,25 @@ function getSandboxSecretKey() {
   return secretKey;
 }
 
-function getCheckoutRedirects(bookingId, successPayment, cancelPayment) {
+function getCheckoutRedirects(bookingId, successPayment, cancelPayment, idParameter = 'bookingId') {
   const appUrl = process.env.APP_URL || 'http://localhost:3000';
   try {
     const successUrl = new URL('/', appUrl);
     const cancelUrl = new URL('/', appUrl);
     successUrl.searchParams.set('payment', successPayment);
-    successUrl.searchParams.set('bookingId', bookingId);
+    successUrl.searchParams.set(idParameter, bookingId);
     cancelUrl.searchParams.set('payment', cancelPayment);
-    cancelUrl.searchParams.set('bookingId', bookingId);
+    cancelUrl.searchParams.set(idParameter, bookingId);
     return { successUrl: successUrl.toString(), cancelUrl: cancelUrl.toString() };
   } catch {
     throw new ApiError(503, 'APP_URL must be a valid absolute URL for checkout redirects.');
   }
 }
 
-async function createPayMongoCheckout({ bookingId, equipmentName, amount, successUrl, cancelUrl }) {
+async function createPayMongoCheckout({ bookingId, equipmentName, amount, successUrl, cancelUrl, metadata = { booking_id: bookingId }, idempotencyKey = `booking-${bookingId}` }) {
   return paymongoRequest('/checkout_sessions', {
     method: 'POST',
-    headers: { 'Idempotency-Key': `booking-${bookingId}` },
+    headers: { 'Idempotency-Key': idempotencyKey },
     body: JSON.stringify({
       data: {
         attributes: {
@@ -69,7 +72,7 @@ async function createPayMongoCheckout({ bookingId, equipmentName, amount, succes
           success_url: successUrl,
           cancel_url: cancelUrl,
           reference_number: bookingId,
-          metadata: { booking_id: bookingId }
+          metadata
         }
       }
     })
@@ -239,6 +242,48 @@ export function createPaymentsRouter(prisma) {
     }
   }
 
+  function featurePaymentIsPaid(session) {
+    return session.attributes?.status === 'paid'
+      || session.attributes?.payments?.some(payment => payment.attributes?.status === 'paid') === true;
+  }
+
+  function verifyFeaturePaymentAmount(session) {
+    const paidPayment = session.attributes?.payments?.find(payment => payment.attributes?.status === 'paid');
+    const lineItemsAmount = session.attributes?.line_items?.reduce(
+      (total, lineItem) => total + Number(lineItem.amount || 0) * Number(lineItem.quantity || 1),
+      0
+    );
+    const amount = Number(lineItemsAmount || paidPayment?.attributes?.amount || session.attributes?.amount);
+    const currency = paidPayment?.attributes?.currency
+      || session.attributes?.currency
+      || session.attributes?.line_items?.[0]?.currency;
+    if (amount !== FEATURE_LISTING_PRICE_PHP * 100 || (currency && currency.toUpperCase() !== 'PHP')) {
+      throw new ApiError(409, 'Paid Checkout Session does not match the listing feature fee.');
+    }
+  }
+
+  async function activateFeaturedEquipment(equipment, session) {
+    if (!featurePaymentIsPaid(session)) {
+      throw new ApiError(409, 'PayMongo has no paid payment recorded for this listing boost.');
+    }
+    verifyFeaturePaymentAmount(session);
+    if (equipment.featureLastPaidSessionId === session.id) {
+      return equipment;
+    }
+    const equipmentStore = equipment.id.startsWith('local-') ? prisma.localEquipment : prisma.equipment;
+    return equipmentStore.update({
+      where: { id: equipment.id },
+      data: {
+        isFeatured: true,
+        boostRegion: 'Davao Region',
+        featureExpiresAt: new Date(Date.now() + FEATURE_LISTING_DURATION_DAYS * 24 * 60 * 60 * 1000),
+        featureCheckoutSessionId: null,
+        featureCheckoutUrl: null,
+        featureLastPaidSessionId: session.id
+      }
+    });
+  }
+
   function markMockCheckoutPaid(session) {
     const paidPayment = session.attributes?.payments?.find(payment => payment.attributes?.status === 'paid');
     const lineItemsAmount = session.attributes?.line_items?.reduce(
@@ -262,6 +307,7 @@ export function createPaymentsRouter(prisma) {
     if (!/^[a-zA-Z0-9_-]{1,80}$/.test(bookingId)) {
       throw new ApiError(400, 'bookingId contains invalid characters.');
     }
+
     const equipmentId = requireNumber(body?.equipmentId, 'equipmentId', { integer: true });
     const rentalHours = requireNumber(body?.rentalHours, 'rentalHours', { integer: true });
     const distanceKm = requireNumber(body?.distanceKm, 'distanceKm');
@@ -272,26 +318,27 @@ export function createPaymentsRouter(prisma) {
       throw new ApiError(400, 'distanceKm must have at most 3 decimal places and be no greater than 9999999.999.');
     }
     const equipment = demoEquipment.find(item => item.mockId === equipmentId);
-    if (!equipment) {
-      throw new ApiError(404, 'Mock equipment was not found.');
-    }
+    const equipmentName = equipment?.name || requireText(body?.equipmentName, 'equipmentName');
+    const hourlyRate = equipment?.hourlyRate ?? requireNumber(body?.hourlyRate, 'hourlyRate');
+    const baseDeliveryFee = equipment?.baseDeliveryFee ?? requireNumber(body?.baseDeliveryFee, 'baseDeliveryFee');
+    const ratePerKm = equipment?.ratePerKm ?? requireNumber(body?.ratePerKm, 'ratePerKm');
     const existing = mockCheckouts.get(bookingId);
     if (existing) {
       return { checkout_session_id: existing.sessionId, checkout_url: existing.checkoutUrl };
     }
 
     const financials = calculateBookingFinancials(
-      equipment.hourlyRate,
+      hourlyRate,
       rentalHours,
-      equipment.baseDeliveryFee,
-      equipment.ratePerKm,
+      baseDeliveryFee,
+      ratePerKm,
       distanceKm
     );
     const amount = new Prisma.Decimal(financials.grossTotal).mul(100).toDecimalPlaces(0).toNumber();
     const { successUrl, cancelUrl } = getCheckoutRedirects(bookingId, 'mock_submitted', 'mock_cancelled');
     const session = await createPayMongoCheckout({
       bookingId,
-      equipmentName: equipment.name,
+      equipmentName,
       amount,
       successUrl,
       cancelUrl
@@ -299,10 +346,11 @@ export function createPaymentsRouter(prisma) {
     const checkoutUrl = requireCheckoutUrl(session);
     const checkout = {
       bookingId,
+      equipmentId,
       sessionId: session.id,
       checkoutUrl,
       amount,
-      equipmentName: equipment.name,
+      equipmentName,
       financials,
       status: 'AWAITING_PAYMENT'
     };
@@ -310,6 +358,106 @@ export function createPaymentsRouter(prisma) {
     mockBookingBySession.set(session.id, checkout);
     return { checkout_session_id: session.id, checkout_url: checkoutUrl };
   }
+
+  router.post('/equipment/:equipmentId/feature-checkout-session', asyncHandler(async (req, res) => {
+    const equipmentId = requireText(req.params.equipmentId, 'equipmentId');
+    const ownerId = requireText(req.body?.ownerId, 'ownerId');
+    const isLocalEquipment = equipmentId.startsWith('local-');
+    const equipmentStore = isLocalEquipment ? prisma.localEquipment : prisma.equipment;
+    let equipment = await equipmentStore.findUnique({ where: { id: equipmentId } });
+    if (!equipment && isLocalEquipment && req.body?.localEquipment && typeof req.body.localEquipment === 'object') {
+      const localEquipment = req.body.localEquipment;
+      const nextAvailableDate = localEquipment.nextAvailableDate ? new Date(localEquipment.nextAvailableDate) : null;
+      if (nextAvailableDate && Number.isNaN(nextAvailableDate.getTime())) {
+        throw new ApiError(400, 'localEquipment.nextAvailableDate must be a valid date.');
+      }
+      const equipmentStatus = localEquipment.status || 'AVAILABLE';
+      if (!['AVAILABLE', 'ON_SITE', 'MAINTENANCE'].includes(equipmentStatus)) {
+        throw new ApiError(400, 'localEquipment.status is invalid.');
+      }
+      equipment = await prisma.localEquipment.create({
+        data: {
+          id: equipmentId,
+          ownerId,
+          name: requireText(localEquipment.name, 'localEquipment.name'),
+          hourlyRate: String(requireNumber(localEquipment.hourlyRate, 'localEquipment.hourlyRate')),
+          baseDeliveryFee: String(requireNumber(localEquipment.baseDeliveryFee, 'localEquipment.baseDeliveryFee')),
+          ratePerKm: String(requireNumber(localEquipment.ratePerKm, 'localEquipment.ratePerKm')),
+          status: equipmentStatus,
+          nextAvailableDate,
+          isFeatured: false
+        }
+      });
+    }
+    if (!equipment) throw new ApiError(404, 'Equipment was not found.');
+    if (equipment.ownerId !== ownerId) throw new ApiError(403, 'Only this equipment owner can purchase a listing boost.');
+    if (equipment.isFeatured && (!equipment.featureExpiresAt || equipment.featureExpiresAt > new Date())) {
+      return res.json({ featured: true, equipment });
+    }
+
+    if (equipment.featureCheckoutSessionId && equipment.featureCheckoutUrl) {
+      const previousSession = await paymongoRequest(`/checkout_sessions/${encodeURIComponent(equipment.featureCheckoutSessionId)}`);
+      if (featurePaymentIsPaid(previousSession)) {
+        equipment = await activateFeaturedEquipment(equipment, previousSession);
+        return res.json({ featured: true, equipment });
+      }
+      if (!['expired', 'canceled', 'cancelled'].includes(previousSession.attributes?.status)) {
+        return res.json({
+          checkout_session_id: equipment.featureCheckoutSessionId,
+          checkout_url: equipment.featureCheckoutUrl
+        });
+      }
+    }
+
+    const boostRequestId = randomUUID();
+    const { successUrl, cancelUrl } = getCheckoutRedirects(
+      equipmentId,
+      'feature_submitted',
+      'feature_cancelled',
+      'equipmentId'
+    );
+    const session = await createPayMongoCheckout({
+      bookingId: boostRequestId,
+      equipmentName: `30-day featured listing: ${equipment.name}`,
+      amount: FEATURE_LISTING_PRICE_PHP * 100,
+      successUrl,
+      cancelUrl,
+      idempotencyKey: `feature-${boostRequestId}`,
+      metadata: {
+        purpose: 'listing_feature',
+        equipment_id: equipmentId,
+        feature_duration_days: String(FEATURE_LISTING_DURATION_DAYS)
+      }
+    });
+    const checkoutUrl = requireCheckoutUrl(session);
+    equipment = await equipmentStore.update({
+      where: { id: equipmentId },
+      data: {
+        featureCheckoutSessionId: session.id,
+        featureCheckoutUrl: checkoutUrl
+      }
+    });
+    res.status(201).json({ checkout_session_id: session.id, checkout_url: checkoutUrl });
+  }));
+
+  router.get('/equipment/:equipmentId/feature-status', asyncHandler(async (req, res) => {
+    const equipmentId = requireText(req.params.equipmentId, 'equipmentId');
+    const ownerId = requireText(req.query.ownerId, 'ownerId');
+    const equipmentStore = equipmentId.startsWith('local-') ? prisma.localEquipment : prisma.equipment;
+    const equipment = await equipmentStore.findUnique({ where: { id: equipmentId } });
+    if (!equipment) throw new ApiError(404, 'Equipment was not found.');
+    if (equipment.ownerId !== ownerId) throw new ApiError(403, 'Only this equipment owner can verify a listing boost.');
+
+    if (!equipment.featureCheckoutSessionId) {
+      const isFeatured = equipment.isFeatured
+        && (!equipment.featureExpiresAt || equipment.featureExpiresAt > new Date());
+      return res.json({ featured: isFeatured, equipment: { ...equipment, isFeatured } });
+    }
+    const session = await paymongoRequest(`/checkout_sessions/${encodeURIComponent(equipment.featureCheckoutSessionId)}`);
+    if (!featurePaymentIsPaid(session)) return res.json({ featured: false, status: 'AWAITING_PAYMENT' });
+    const featuredEquipment = await activateFeaturedEquipment(equipment, session);
+    res.json({ featured: true, equipment: featuredEquipment });
+  }));
 
   router.post('/create-checkout-session', asyncHandler(async (req, res) => {
     const bookingId = requireText(req.body?.bookingId, 'bookingId');
@@ -377,10 +525,7 @@ export function createPaymentsRouter(prisma) {
     });
   }));
 
-  router.get('/admin/transactions', asyncHandler(async (req, res) => {
-    if (process.env.NODE_ENV === 'production') {
-      throw new ApiError(404, 'Endpoint was not found.');
-    }
+  router.get('/admin/transactions', requireAdmin, asyncHandler(async (req, res) => {
     const bookings = await prisma.booking.findMany({
       where: { bookingStatus: 'PAID_IN_ESCROW' },
       include: { equipment: { select: { name: true } } },
@@ -491,6 +636,24 @@ export function createPaymentsRouter(prisma) {
         bookingId: mockCheckout.bookingId,
         bookingStatus: mockCheckout.status,
         mock: true
+      });
+    }
+
+    const featuredEquipment = await prisma.equipment.findFirst({
+      where: {
+        OR: [
+          { featureCheckoutSessionId: sessionId },
+          { featureLastPaidSessionId: sessionId }
+        ]
+      }
+    });
+    if (featuredEquipment) {
+      const updatedEquipment = await activateFeaturedEquipment(featuredEquipment, confirmedSession);
+      return res.status(200).json({
+        received: true,
+        equipmentId: updatedEquipment.id,
+        isFeatured: updatedEquipment.isFeatured,
+        featureExpiresAt: updatedEquipment.featureExpiresAt
       });
     }
 

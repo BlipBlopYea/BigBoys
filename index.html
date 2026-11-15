@@ -16,28 +16,60 @@
 <body>
   <div class="loading-screen" id="loading-screen" role="status" aria-label="Loading Big Boys Rental"><div class="loader-content"><span class="loader-mark" aria-hidden="true">BB</span><span class="loader-name">Big Boys Rental</span><span class="loader-track" aria-hidden="true"></span></div></div>
   <section id="login-view" class="login-screen" aria-label="Sign in to Big Boys Rental" hidden>
-    <div class="login-story"><div class="login-story-content"><div class="eyebrow">Heavy equipment for real jobs</div><h1>Equipment for the work ahead.</h1><p>Find dependable machines, manage your equipment, and keep every project moving.</p></div></div>
     <div class="login-panel">
       <a class="login-brand" href="#login" aria-label="Big Boys Rental"><img src="BigBoys.jpg" alt="Big Boys Rental"></a>
+      <button class="login-close" id="login-close" type="button" aria-label="Close sign in">&times;</button>
       <button class="login-back" id="login-back" type="button">Back to equipment listings</button>
       <div class="section-kicker">Welcome back</div><h2>Sign in to continue</h2><p class="login-intro">Access your equipment marketplace account.</p>
       <form class="login-form" id="login-form">
         <div class="form-field"><label for="login-email">Email address</label><input id="login-email" name="email" type="email" autocomplete="username" placeholder="you@company.com" required></div>
         <div class="form-field"><label for="login-password">Password</label><input id="login-password" name="password" type="password" autocomplete="current-password" placeholder="Enter your password" required></div>
-        <div class="form-field"><label for="login-role">I am a</label><select id="login-role" name="role"><option value="contractor">Contractor</option><option value="owner">Equipment owner</option><option value="admin">Platform admin</option></select></div>
         <label class="remember-row"><input id="remember-me" type="checkbox"> Remember me</label>
         <button class="login-submit" type="submit">Sign in <span aria-hidden="true">→</span></button>
       </form>
-      <p class="demo-note">Demo: enter any email and password to open your chosen account.</p>
+      <p class="login-message" id="login-message" role="alert" hidden></p>
+      <p class="demo-note">Use your email and password to access your account.</p>
     </div>
   </section>
 
+  <header class="topbar-frame" id="app-header">
+    <div class="shell topbar" id="app-topbar">
+      <a class="brand" href="#top" aria-label="Big Boys Rental home"><span class="brand-mark" aria-hidden="true">BB</span><span class="brand-name">Big Boys<span id="brand-mode-label">Equipment rental</span></span></a>
+      <button class="mobile-menu-toggle" id="mobile-menu-toggle" type="button" aria-label="Open navigation menu" aria-controls="mobile-nav-drawer" aria-expanded="false"><span aria-hidden="true">☰</span></button>
+      <div class="mobile-nav-drawer" id="mobile-nav-drawer">
+        <nav class="nav-links" id="renter-nav-links" aria-label="Main navigation"><a href="#equipment">Equipment</a><a href="#how-it-works">How it works</a></nav>
+        <nav class="nav-links" id="owner-nav-links" aria-label="Owner navigation" hidden><a href="#fleet">Fleet</a><a href="#owner-bookings">Bookings</a><a href="#owner-add-machine">Add machine</a></nav>
+        <div class="nav-actions">
+          <div class="account-menu" data-account-menu hidden>
+            <button class="notification-bell" type="button" data-menu-bell aria-label="Notifications and saved equipment" aria-expanded="false">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/></svg>
+              <span class="menu-badge" data-menu-badge hidden></span>
+            </button>
+            <section class="account-popover" data-menu-popover hidden aria-label="Notifications and saved equipment">
+              <div class="account-popover-tabs" role="tablist">
+                <button type="button" class="account-tab active" data-menu-tab="notifications" role="tab" aria-selected="true">Notifications</button>
+                <button type="button" class="account-tab" data-menu-tab="saved" role="tab" aria-selected="false">Saved (<span data-saved-tab-count>0</span>)</button>
+              </div>
+              <div class="account-popover-panel" data-menu-panel="notifications" role="tabpanel">
+                <div class="account-popover-heading"><strong>Notifications</strong><button class="utility-button" type="button" data-mark-read>Mark all as read</button></div>
+                <div class="notification-list" data-notification-list></div>
+              </div>
+              <div class="account-popover-panel" data-menu-panel="saved" role="tabpanel" hidden>
+                <div class="account-popover-heading"><strong>Saved equipment</strong></div>
+                <div class="saved-list" data-saved-list></div>
+              </div>
+            </section>
+          </div>
+          <button class="mode-switch-button" id="owner-mode-switch" type="button" hidden>Switch to Owner Dashboard</button>
+          <button class="mode-switch-button" id="renter-mode-switch" type="button" hidden>Switch to Renter View</button>
+          <button class="sign-in-button" id="sign-in-button" type="button">Sign in</button>
+          <span id="account-email" hidden></span>
+          <button class="signout-button" id="app-signout-button" type="button" data-signout hidden>Sign out</button>
+        </div>
+      </div>
+    </div>
+  </header>
   <div id="contractor-view" class="app-view">
-    <header class="shell topbar">
-      <a class="brand" href="#top" aria-label="Big Boys Rental home"><span class="brand-mark" aria-hidden="true">BB</span><span class="brand-name">Big Boys<span>Equipment rental</span></span></a>
-      <nav class="nav-links" aria-label="Main navigation"><a href="#equipment">Equipment</a><a href="#how-it-works">How it works</a></nav>
-      <div class="nav-actions"><a href="#equipment" id="saved-link" hidden>Saved <span id="saved-count">0</span></a><button class="sign-in-button" id="sign-in-button" type="button">Sign in</button><button class="signout-button" type="button" data-signout hidden>Sign out</button></div>
-    </header>
     <main id="top" class="shell">
       <section class="hero" aria-labelledby="hero-title">
         <div class="hero-photo" role="img" aria-label="Heavy equipment at an active construction site"></div>
@@ -70,27 +102,7 @@
         <div class="promise-item"><span class="promise-number">03</span><span><strong>Get straight to work</strong><small>Pickup or delivery options</small></span></div>
       </section>
     </main>
-    <footer id="footer"><div class="shell footer-inner"><div class="footer-brand">Big Boys Rental</div><p>Reliable equipment. Helpful service. Ready for the job.</p><p>© 2026 Big Boys Rental</p></div></footer>
-    <dialog id="equipment-dialog" class="calc-dialog" aria-labelledby="dialog-title">
-      <div class="dialog-gallery">
-        <img class="dialog-image" id="dialog-image" alt="">
-        <button class="gallery-nav" id="previous-photo" type="button" aria-label="Previous machine photo">&#8249;</button>
-        <button class="gallery-nav" id="next-photo" type="button" aria-label="Next machine photo">&#8250;</button>
-        <span class="gallery-count" id="dialog-photo-count" aria-live="polite"></span>
-      </div>
-      <div class="dialog-content"><div class="section-kicker" id="dialog-type"></div><h2 id="dialog-title"></h2><p id="dialog-description"></p>
-        <div class="calc-fields"><div class="form-field"><label for="booking-hours">Rental hours</label><input id="booking-hours" type="number" min="1" max="24" step="1" value="8"></div><div class="form-field"><label for="booking-miles">Distance to job site (km)</label><input id="booking-miles" type="number" min="0" step="0.1" value="10"></div><div class="form-field"><label for="booking-start-date">Start date</label><input id="booking-start-date" type="date" required></div><div class="form-field"><label for="booking-end-date">End date</label><input id="booking-end-date" type="date" required></div></div>
-        <p class="availability-message" id="booking-availability" role="status"></p>
-        <div class="calc-line"><span>Rental (<span id="calc-hours">8</span> hr × <span id="calc-rate">₱0</span>/hr)</span><strong id="calc-rental">₱0</strong></div>
-        <div class="calc-line"><span>Base delivery charge</span><strong id="calc-mobilization">₱0</strong></div>
-        <div class="calc-line"><span>Travel charge (<span id="calc-distance">10</span> km × 2 × <span id="calc-mile-rate">₱0</span>/km)</span><strong id="calc-mileage">₱0</strong></div>
-        <div class="calc-total"><span>Estimated total</span><strong id="calc-total">₱0</strong></div>
-        <button class="owner-submit" id="request-button" type="button">Request this machine</button>
-        <p class="calc-disclaimer">Estimate only. The owner confirms availability, delivery distance, and final charges before accepting your request.</p>
-        <div class="dialog-actions"><button class="dialog-close" type="button" id="dialog-close">Close</button></div>
-      </div>
-    </dialog>
-    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+    <footer id="footer"><div class="shell footer-inner"><div class="footer-brand">Big Boys Rental</div><p>Reliable equipment. Helpful service. Ready for the job.</p><p>© 2026 Big Boys Rental</p><a class="admin-portal-link" id="admin-portal-link" href="#admin">Admin Portal</a></div></footer>
   </div>
 
   <dialog id="checkout-dialog" class="checkout-dialog" aria-labelledby="checkout-title">
@@ -113,13 +125,6 @@
   </dialog>
 
   <div id="owner-view" class="app-view" hidden>
-    <header class="portal-topline shell">
-      <div class="topbar">
-        <a class="brand" href="#owner" aria-label="Big Boys Rental owner portal"><span class="brand-mark" aria-hidden="true">BB</span><span class="brand-name">Big Boys<span>Fleet portal</span></span></a>
-        <nav class="nav-links" aria-label="Owner navigation"><a href="#fleet">Fleet</a><a href="#owner-bookings">Bookings</a><a href="#owner-add-machine">Add machine</a></nav>
-      </div>
-      <div class="account-controls"><span id="owner-account-email">Owner account</span><button class="signout-button" type="button" data-signout>Sign out</button></div>
-    </header>
     <main class="shell portal-main">
       <section class="owner-welcome"><div><div class="section-kicker">Equipment owner</div><h1>Good morning, <span id="owner-first-name">Alex</span></h1><p>Manage your machines and booking requests.</p></div><span class="verified-badge">Verified owner</span></section>
       <section class="company-grid" aria-label="Company and yard details">
@@ -138,13 +143,13 @@
         <div class="fleet-grid" id="fleet-grid"></div>
       </section>
       <section class="portal-section" id="owner-bookings" aria-labelledby="owner-bookings-title">
-        <div class="dashboard-head"><div><div class="section-kicker">Rental operations</div><h2 id="owner-bookings-title">Booking requests</h2></div><div class="status-legend" aria-label="Booking statuses"><span class="status-pill pending">Pending approval</span><span class="status-pill">Awaiting payment</span><span class="status-pill onsite">Paid in escrow</span><span class="status-pill completed">Completed</span></div></div>
+        <div class="dashboard-head"><div><div class="section-kicker">Rental operations</div><h2 id="owner-bookings-title">Booking requests</h2></div><div class="status-legend" aria-label="Booking statuses"><span class="status-pill pending">Pending approval</span><span class="status-pill">Awaiting payment</span><span class="status-pill onsite">Paid in escrow</span><span class="status-pill completed">Completed</span><span class="status-pill declined">Declined</span></div></div>
         <div class="portal-table-wrap"><table class="portal-table"><thead><tr><th>Machine</th><th>Renter</th><th>Job location</th><th>Schedule</th><th>Status</th><th>Action</th></tr></thead><tbody id="booking-rows"></tbody></table></div>
       </section>
       <section class="workflow-section portal-section" id="owner-add-machine" aria-labelledby="owner-title">
         <div class="owner-layout">
           <div class="owner-copy"><div class="section-kicker">Expand your fleet</div><h2 id="owner-title">List your machine</h2><p>Add machine details, set hourly and delivery rates, preview your estimated net payout, and attach photos. New inventory is added to the marketplace.</p></div>
-          <form class="owner-form" id="owner-form">
+          <div class="owner-form-slot" id="owner-form-slot"><form class="owner-form" id="owner-form">
             <div class="form-field"><label for="machine-name">Machine name</label><input id="machine-name" name="name" placeholder="e.g. Komatsu PC200 Excavator" required></div>
             <div class="form-field"><label for="machine-type">Equipment type</label><select id="machine-type" name="type" required><option value="Excavator">Excavator</option><option value="Backhoe">Backhoe</option><option value="Loader">Loader</option><option value="Boom lift">Boom lift</option><option value="Compaction">Compaction</option><option value="Other">Other</option></select></div>
             <div class="form-field full"><label for="machine-location">City or yard location</label><input id="machine-location" name="location" placeholder="e.g. Tagum City" required></div>
@@ -155,22 +160,34 @@
             <div class="form-field full"><label for="machine-specs">Machine details / notes</label><input id="machine-specs" name="specs" placeholder="Size, lifting height, attachments"></div>
             <div class="form-field full"><label for="machine-photo">Machine photos</label><input id="machine-photo" name="photos" type="file" accept="image/*" multiple><span class="form-hint">Add up to 8 photos. The first photo will be the cover image; renters can browse the rest.</span></div>
             <div id="photo-previews" class="photo-previews form-field full" aria-live="polite"></div>
+            <div class="form-field full edit-feature-section" id="edit-feature-section" hidden>
+              <div><strong>Boost / Feature Listing</strong><small>₱299 for 30 days · Davao Region priority</small></div>
+              <button class="feature-boost-button" id="edit-feature-button" type="button">Boost / Feature</button>
+            </div>
             <button class="owner-submit" id="machine-submit" type="submit">Add machine to fleet</button>
             <button class="dialog-close cancel-edit-button" id="cancel-machine-edit" type="button" hidden>Cancel edit</button>
-          </form>
+            <button class="delete-listing-button" id="delete-machine-button" type="button" hidden>Delete Listing</button>
+          </form></div>
         </div>
       </section>
     </main>
     <footer><div class="shell footer-inner"><div class="footer-brand">Big Boys Rental · Fleet Portal</div><p>Private owner workspace</p><p>© 2026 Big Boys Rental</p></div></footer>
   </div>
 
+  <dialog id="edit-equipment-dialog" class="edit-equipment-dialog" aria-labelledby="edit-equipment-heading">
+    <div class="edit-dialog-heading"><h2 id="edit-equipment-heading">Edit equipment</h2><button class="login-close" id="edit-equipment-close" type="button" aria-label="Close edit equipment">&times;</button></div>
+    <div id="edit-form-slot"></div>
+  </dialog>
+
   <div id="admin-view" class="app-view" hidden>
-    <header class="portal-topline shell">
-      <div class="topbar">
-        <a class="brand" href="#admin" aria-label="Big Boys Rental admin portal"><span class="brand-mark" aria-hidden="true">BB</span><span class="brand-name">Big Boys<span>Platform admin</span></span></a>
-        <nav class="nav-links" aria-label="Admin navigation"><a href="#admin-ledger">Transaction ledger</a></nav>
+    <header class="portal-topline">
+      <div class="shell portal-header-inner">
+        <div class="topbar">
+          <a class="brand" href="#admin" aria-label="Big Boys Rental admin portal"><span class="brand-mark" aria-hidden="true">BB</span><span class="brand-name">Big Boys<span>Platform admin</span></span></a>
+          <nav class="nav-links" aria-label="Admin navigation"><a href="#admin-ledger">Transaction ledger</a></nav>
+        </div>
+        <div class="account-controls"><span id="admin-account-email">Admin account</span><button class="signout-button" type="button" data-signout>Sign out</button></div>
       </div>
-      <div class="account-controls"><span id="admin-account-email">Admin account</span><button class="signout-button" type="button" data-signout>Sign out</button></div>
     </header>
     <main class="shell portal-main">
       <section class="owner-welcome"><div><div class="section-kicker">Platform administration</div><h1>Transaction ledger</h1><p>Review sandbox payments collected in escrow and the platform revenue split.</p></div><span class="verified-badge">Sandbox ledger</span></section>
@@ -187,6 +204,40 @@
     <footer><div class="shell footer-inner"><div class="footer-brand">Big Boys Rental · Platform Admin</div><p>Internal sandbox transaction ledger</p><p>© 2026 Big Boys Rental</p></div></footer>
   </div>
 
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <dialog id="bookingModal" class="calc-dialog" aria-labelledby="dialog-title">
+    <div class="booking-machine-column">
+      <div class="dialog-gallery">
+        <img class="dialog-image" id="dialog-image" alt="">
+        <button class="gallery-nav" id="previous-photo" type="button" aria-label="Previous machine photo">&#8249;</button>
+        <button class="gallery-nav" id="next-photo" type="button" aria-label="Next machine photo">&#8250;</button>
+        <span class="gallery-count" id="dialog-photo-count" aria-live="polite"></span>
+      </div>
+      <div class="booking-machine-details"><div class="section-kicker" id="dialog-type"></div><h2 id="dialog-title"></h2><p id="dialog-description"></p></div>
+    </div>
+    <div class="dialog-content booking-form-column">
+      <div class="calc-fields"><div class="form-field"><label for="booking-hours">Rental hours</label><input id="booking-hours" type="number" min="1" max="24" step="1" value="8"></div><div class="form-field"><label for="booking-miles">Distance to job site (km)</label><input id="booking-miles" type="number" min="0" step="0.1" value="10"></div><div class="form-field"><label for="booking-start-date">Start date</label><input id="booking-start-date" type="date" required></div><div class="form-field"><label for="booking-end-date">End date</label><input id="booking-end-date" type="date" required></div></div>
+      <p class="availability-message" id="booking-availability" role="status"></p>
+      <div class="calc-line"><span>Rental (<span id="calc-hours">8</span> hr × <span id="calc-rate">₱0</span>/hr)</span><strong id="calc-rental">₱0</strong></div>
+      <div class="calc-line"><span>Base delivery charge</span><strong id="calc-mobilization">₱0</strong></div>
+      <div class="calc-line"><span>Travel charge (<span id="calc-distance">10</span> km × 2 × <span id="calc-mile-rate">₱0</span>/km)</span><strong id="calc-mileage">₱0</strong></div>
+      <div class="calc-total"><span>Estimated total</span><strong id="calc-total">₱0</strong></div>
+      <button class="owner-submit" id="request-button" type="button">Confirm Booking</button>
+      <p class="calc-disclaimer">Estimate only. The owner confirms availability, delivery distance, and final charges before accepting your request.</p>
+      <div class="dialog-actions"><button class="dialog-close" type="button" id="dialog-close">Close</button></div>
+    </div>
+  </dialog>
+  <dialog id="feature-checkout-dialog" class="feature-checkout-dialog" aria-labelledby="feature-checkout-title">
+    <div class="edit-dialog-heading">
+      <h2 id="feature-checkout-title">Boost this listing</h2>
+      <button class="login-close" id="feature-checkout-close" type="button" aria-label="Close listing boost checkout">&times;</button>
+    </div>
+    <p id="feature-checkout-machine"></p>
+    <div class="feature-checkout-price">₱299 <small>one-time · 30 days</small></div>
+    <p>Pay securely with PayMongo Sandbox to highlight this listing and prioritize it in Davao Region searches.</p>
+    <p class="feature-checkout-message" id="feature-checkout-message" role="alert" hidden></p>
+    <button class="owner-submit" id="feature-checkout-button" type="button">Continue to PayMongo</button>
+  </dialog>
   <script src="app.js" defer></script>
 </body>
 </html>
