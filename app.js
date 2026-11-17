@@ -519,6 +519,23 @@ const equipment = [
       if (!date) return 'date to be confirmed';
       return new Date(`${availabilityDateISO(date)}T00:00:00`).toLocaleDateString('en-PH', { year: 'numeric', month: 'short', day: 'numeric' });
     };
+    const getAvailabilityBadge = machine => {
+      const returnDate = availabilityDateISO(machine.nextAvailableDate);
+      return {
+        className: machine.status === 'ON_SITE' && returnDate
+          ? 'onsite'
+          : machine.status === 'MAINTENANCE'
+            ? 'maintenance'
+            : 'available',
+        label: machine.status === 'ON_SITE' && !returnDate
+          ? 'On site · Return date to be confirmed'
+          : machine.status === 'ON_SITE'
+            ? `On site until ${formatAvailabilityDate(machine.nextAvailableDate)} • Pre-bookable starting ${formatBookingDate(dayAfterISO(machine.nextAvailableDate))}`
+            : machine.status === 'MAINTENANCE'
+              ? 'Maintenance'
+              : 'Available Now'
+      };
+    };
     function getBookingFinancials(machine, hours, distance) {
       const rentalCost = hours * machine.hourly;
       const travelCharge = distance * 2 * machine.ratePerKm;
@@ -563,17 +580,13 @@ const equipment = [
         grid.innerHTML = `<div class="empty-state">No machines match these filters. ${scopeHelp}</div>`;
         return;
       }
-      grid.innerHTML = matches.map((item, index) => `
+      grid.innerHTML = matches.map((item, index) => {
+        const availabilityBadge = getAvailabilityBadge(item);
+        return `
         <article class="equipment-card ${isCurrentlyFeatured(item) ? 'featured' : ''}" style="--card-index:${index}">
           <div class="card-image">
             <img src="${escapeHTML(item.images?.[0] || item.image)}" alt="${escapeHTML(item.type)} available for rent" loading="lazy">
-            <span class="badge availability-badge ${item.status === 'ON_SITE' && availabilityDateISO(item.nextAvailableDate) ? 'onsite' : item.status === 'MAINTENANCE' ? 'maintenance' : 'available'}">${item.status === 'ON_SITE' && !availabilityDateISO(item.nextAvailableDate)
-              ? 'On site · Return date to be confirmed'
-              : item.status === 'ON_SITE'
-                ? `On site until ${formatAvailabilityDate(item.nextAvailableDate)} • Pre-bookable starting ${formatBookingDate(dayAfterISO(item.nextAvailableDate))}`
-                : item.status === 'MAINTENANCE'
-                  ? 'Maintenance'
-                  : 'Available Now'}</span>
+            <span class="badge availability-badge ${availabilityBadge.className}">${escapeHTML(availabilityBadge.label)}</span>
             <button
               class="save-button ${saved.has(item.id) ? 'saved' : ''}"
               type="button"
@@ -596,7 +609,8 @@ const equipment = [
               <button class="detail-button" type="button" data-detail="${item.id}">Request Booking</button>
             </div>
           </div>
-        </article>`).join('');
+        </article>`;
+      }).join('');
     }
 
     function renderBookings() {
@@ -1074,7 +1088,26 @@ const equipment = [
       selectedMachine = machine;
       activePhotoIndex = 0;
       updateDialogPhoto();
-      document.querySelector('#dialog-type').textContent = `${machine.type} · ${machine.location} · ${peso(machine.hourly)}/hour`;
+      const availability = getAvailabilityBadge(machine);
+      const gallery = document.querySelector('.booking-machine-column .dialog-gallery');
+      let availabilityBadge = gallery.querySelector('.dialog-availability-badge');
+      if (!availabilityBadge) {
+        availabilityBadge = document.createElement('span');
+        availabilityBadge.className = 'badge availability-badge dialog-availability-badge';
+        gallery.append(availabilityBadge);
+      }
+      availabilityBadge.classList.remove('onsite', 'maintenance', 'available');
+      availabilityBadge.classList.add(availability.className);
+      availabilityBadge.textContent = availability.label;
+
+      const dialogType = document.querySelector('#dialog-type');
+      dialogType.textContent = `${machine.type} · ${machine.location} · ${peso(machine.hourly)}/hour`;
+      if (isCurrentlyFeatured(machine)) {
+        const featuredBadge = document.createElement('span');
+        featuredBadge.className = 'featured-badge dialog-featured-badge';
+        featuredBadge.textContent = 'FEATURED';
+        dialogType.append(' ', featuredBadge);
+      }
       document.querySelector('#dialog-title').textContent = machine.name;
       document.querySelector('#dialog-description').textContent = machine.description;
       document.querySelector('#booking-hours').value = 8;
